@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CSC 235 – Brooklyn Museum Art Gallery Game</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    #hud {
+      position: fixed;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      color: #f5f5f5;
+      text-shadow: 0 0 4px #000;
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      font-size: 15px;
+    }
+
+    #darkOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0);
+      pointer-events: none;
+      z-index: 9;
+      transition: background 0.12s linear;
+    }
+
+    #centerOverlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      background: radial-gradient(circle at top, rgba(10,10,25,0.9), rgba(0,0,0,0.97));
+      color: #f5f5f5;
+    }
+
+    #centerPanel {
+      max-width: 720px;
+      padding: 20px 26px;
+      border-radius: 10px;
+      border: 1px solid #555;
+      background: rgba(0,0,0,0.4);
+      box-shadow: 0 0 25px rgba(0,0,0,0.8);
+    }
+
+    #centerPanel h1 {
+      margin: 0 0 8px 0;
+      font-size: 26px;
+    }
+
+    #centerPanel p {
+      font-size: 14px;
+      line-height: 1.4;
+      margin: 6px 0;
+    }
+
+    #targetsList {
+      margin: 8px 0 8px 14px;
+      padding: 0;
+      font-size: 14px;
+    }
+
+    #targetsList li {
+      margin-bottom: 4px;
+    }
+
+    #startBtn, #restartBtn {
+      margin-top: 14px;
+      padding: 8px 18px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      background: #f0c46a;
+      color: #231b11;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    #startBtn:hover, #restartBtn:hover {
+      background: #ffd98c;
+    }
+
+    #crosshair {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      width: 12px;
+      height: 12px;
+      margin-left: -6px;
+      margin-top: -6px;
+      border-radius: 999px;
+      border: 2px solid rgba(255,255,255,0.75);
+      box-shadow: 0 0 5px rgba(0,0,0,0.8);
+      z-index: 8;
+      pointer-events: none;
+    }
+
+    a {
+      color: #ffd892;
+    }
+
+    a:hover {
+      color: #ffe8b7;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HUD -->
+  <div id="hud">
+    <span id="timerDisplay">Time: 03:00</span>
+    <span id="progressDisplay">Collected: 0 / 3</span>
+  </div>
+
+  <!-- Darkness overlay -->
+  <div id="darkOverlay"></div>
+
+  <!-- Simple crosshair -->
+  <div id="crosshair"></div>
+
+  <!-- Center overlay for intro / win / lose -->
+  <div id="centerOverlay">
+    <div id="centerPanel">
+      <h1 id="centerTitle">Brooklyn Museum Night Watch</h1>
+      <p id="centerText">
+        You are the lone night guard in a small Brooklyn Museum gallery. Three works from the museum’s
+        online collection have been flagged for inspection, but the power is fading. You have just a few
+        minutes to locate them before the gallery goes completely dark.
+      </p>
+      <p style="font-weight:600; margin-top:10px; margin-bottom:4px;">Tonight’s target paintings:</p>
+      <ul id="targetsList"></ul>
+      <p style="font-size:12px; opacity:0.9;">
+        Controls: <b>WASD</b> or <b>Arrow keys</b> to walk, hold <b>Right Mouse</b> to look around,
+        and <b>Left-click</b> a painting (aim with the circle) to collect it.
+        Some rooms are connected by doorways and short hallways.
+      </p>
+      <button id="startBtn">Start Night Shift</button>
+      <button id="restartBtn" style="display:none;">Restart</button>
+    </div>
+  </div>
+
+  <!-- Three.js r128 (same version as the professor’s example) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    // ===================== GLOBALS =====================
+    let scene, camera, renderer;
+    let wallSegments = [];
+    let wallBoxes = [];
+    let paintings = [];
+    let raycaster = new THREE.Raycaster();
+
+    // player / camera
+    const keys = {};
+    let yaw = 0;
+    let pitch = 0;
+    const moveSpeed = 6.0;     // units per second
+    const lookSpeed = 0.002;
+    let isLooking = false;     // right mouse held?
+
+    // game / timer
+    const GAME_DURATION = 180; // seconds (~3 minutes)
+    let gameStarted = false;
+    let gameOver = false;
+    let startTimeMs = 0;
+
+    // targets
+    const totalTargets = 3;
+    let targetPaintings = [];   // painting config objects
+    let collectedCount = 0;
+
+    // DOM
+    const timerDisplay    = document.getElementById("timerDisplay");
+    const progressDisplay = document.getElementById("progressDisplay");
+    const darkOverlay     = document.getElementById("darkOverlay");
+    const centerOverlay   = document.getElementById("centerOverlay");
+    const centerTitle     = document.getElementById("centerTitle");
+    const centerText      = document.getElementById("centerText");
+    const targetsList     = document.getElementById("targetsList");
+    const startBtn        = document.getElementById("startBtn");
+    const restartBtn      = document.getElementById("restartBtn");
+
+    // ===================== PAINTING DATA (TODOs) =====================
+    // You can keep these as TODOs for now.
+    // Later, replace url + archiveUrl with real Brooklyn Museum images / links.
+    const paintingConfigs = [
+      {
+        id: "painting_1",
+        title: "TODO – Brooklyn Museum Work 1",
+        url: "TODO-image-url-1.jpg",
+        archiveUrl: "TODO-archive-link-1",
+        size: { width: 3.2, height: 4.0 }
+      },
+      {
+        id: "painting_2",
+        title: "TODO – Brooklyn Museum Work 2",
+        url: "TODO-image-url-2.jpg",
+        archiveUrl: "TODO-archive-link-2",
+        size: { width: 3.5, height: 4.0 }
+      },
+      {
+        id: "painting_3",
+        title: "TODO – Brooklyn Museum Work 3",
+        url: "TODO-image-url-3.jpg",
+        archiveUrl: "TODO-archive-link-3",
+        size: { width: 3.0, height: 4.0 }
+      },
+      {
+        id: "painting_4",
+        title: "TODO – Brooklyn Museum Work 4",
+        url: "TODO-image-url-4.jpg",
+        archiveUrl: "TODO-archive-link-4",
+        size: { width: 3.0, height: 4.0 }
+      },
+      {
+        id: "painting_5",
+        title: "TODO – Brooklyn Museum Work 5",
+        url: "TODO-image-url-5.jpg",
+        archiveUrl: "TODO-archive-link-5",
+        size: { width: 3.0, height: 4.0 }
+      },
+      {
+        id: "painting_6",
+        title: "TODO – Brooklyn Museum Work 6",
+        url: "TODO-image-url-6.jpg",
+        archiveUrl: "TODO-archive-link-6",
+        size: { width: 3.0, height: 4.0 }
+      },
+      {
+        id: "painting_7",
+        title: "TODO – Brooklyn Museum Work 7",
+        url: "TODO-image-url-7.jpg",
+        archiveUrl: "TODO-archive-link-7",
+        size: { width: 3.0, height: 4.0 }
+      },
+      {
+        id: "painting_8",
+        title: "TODO – Brooklyn Museum Work 8",
+        url: "TODO-image-url-8.jpg",
+        archiveUrl: "TODO-archive-link-8",
+        size: { width: 3.0, height: 4.0 }
+      },
+      {
+        id: "painting_9",
+        title: "TODO – Brooklyn Museum Work 9",
+        url: "TODO-image-url-9.jpg",
+        archiveUrl: "TODO-archive-link-9",
+        size: { width: 3.0, height: 4.0 }
+      },
+      {
+        id: "painting_10",
+        title: "TODO – Brooklyn Museum Work 10",
+        url: "TODO-image-url-10.jpg",
+        archiveUrl: "TODO-archive-link-10",
+        size: { width: 3.0, height: 4.0 }
+      }
+    ];
+
+    // ===================== UTILS =====================
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    // Procedural "vintage" wallpaper texture (no external file needed)
+    function createWallpaperTexture(baseColor, stripeColor) {
+      const size = 256;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = baseColor;
+      ctx.fillRect(0, 0, size, size);
+
+      ctx.fillStyle = stripeColor;
+      for (let x = 0; x < size; x += 16) {
+        ctx.fillRect(x, 0, 6, size);
+      }
+      ctx.globalAlpha = 0.18;
+      for (let y = 0; y < size; y += 30) {
+        ctx.fillRect(0, y, size, 4);
+      }
+      ctx.globalAlpha = 1.0;
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2, 2);
+      return texture;
+    }
+
+    // ===================== SCENE SETUP =====================
+    function init() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x05070d);
+      scene.fog = new THREE.Fog(0x05070d, 10, 80);
+
+      camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        200
+      );
+      camera.position.set(0, 1.7, 0); // start in center room
+      camera.rotation.order = "YXZ";
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      // Lighting: ambient + 1 point light per room
+      const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+      scene.add(ambient);
+
+      // Floor & ceiling for whole gallery
+      const floorGeo = new THREE.PlaneGeometry(80, 80);
+      const floorMat = new THREE.MeshLambertMaterial({ color: 0x202124 });
+      const floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.receiveShadow = true;
+      scene.add(floor);
+
+      const ceilGeo = new THREE.PlaneGeometry(80, 80);
+      const ceilMat = new THREE.MeshLambertMaterial({ color: 0x0f1014 });
+      const ceiling = new THREE.Mesh(ceilGeo, ceilMat);
+      ceiling.rotation.x = Math.PI / 2;
+      ceiling.position.y = 6.5;
+      scene.add(ceiling);
+
+      // Five different wallpaper textures
+      const wallpapers = [
+        createWallpaperTexture("#2e2626", "#5c3b3b"),
+        createWallpaperTexture("#222835", "#3b4a66"),
+        createWallpaperTexture("#2b2f24", "#4f5a38"),
+        createWallpaperTexture("#2d2733", "#534163"),
+        createWallpaperTexture("#2c2620", "#62503b")
+      ];
+
+      // Create rooms in a plus shape: center + 4 around
+      const rooms = [];
+      rooms.push(createRoom(0, 0, wallpapers[0]));     // center
+      rooms.push(createRoom(0, -24, wallpapers[1]));   // north
+      rooms.push(createRoom(0,  24, wallpapers[2]));   // south
+      rooms.push(createRoom(-24, 0, wallpapers[3]));   // west
+      rooms.push(createRoom( 24, 0, wallpapers[4]));   // east
+
+      // Lights roughly in center of each room
+      const lightPositions = [
+        new THREE.Vector3(0,    5.8,  0),
+        new THREE.Vector3(0,    5.8, -24),
+        new THREE.Vector3(0,    5.8,  24),
+        new THREE.Vector3(-24,  5.8,  0),
+        new THREE.Vector3(24,   5.8,  0)
+      ];
+      const lightColors = [0xfff5d6, 0xffe7c4, 0xf0f3ff, 0xfbe4ff, 0xe8fff3];
+
+      for (let i = 0; i < lightPositions.length; i++) {
+        const pLight = new THREE.PointLight(lightColors[i], 1.0, 40, 2);
+        pLight.position.copy(lightPositions[i]);
+        pLight.castShadow = true;
+        scene.add(pLight);
+      }
+
+      // Build wall bounding boxes once
+      buildWallBoxes();
+
+      // Create paintings & targets
+      createPaintings();
+      chooseTargets();
+      setTargetsUI();
+
+      // Input & events
+      setupInput();
+      window.addEventListener("resize", onWindowResize);
+
+      // Start render loop
+      animate();
+    }
+
+    // Create one rectangular room with doorways on all four sides
+    function createRoom(cx, cz, wallpaperTexture) {
+      const roomGroup = new THREE.Group();
+      roomGroup.position.set(cx, 0, cz);
+
+      const wallWidth  = 20; // along x
+      const wallHeight = 8;
+      const wallDepth  = 0.4;
+
+      // material using the wallpaper texture
+      const wallMat = new THREE.MeshLambertMaterial({
+        map: wallpaperTexture
+      });
+
+      // Helper: replicate professor's doorway wall
+      function createWallWithDoorway() {
+        const wallGroup = new THREE.Group();
+        const doorwayWidth = 4;
+        const doorwayHeight = 5;
+
+        // Left segment
+        const leftGeo = new THREE.BoxGeometry(
+          (wallWidth - doorwayWidth) / 2,
+          wallHeight,
+          wallDepth
+        );
+        const leftWall = new THREE.Mesh(leftGeo, wallMat);
+        leftWall.position.set(-(wallWidth + doorwayWidth) / 4, wallHeight / 2, 0);
+        leftWall.userData.isWall = true;
+        wallGroup.add(leftWall);
+
+        // Right segment
+        const rightGeo = new THREE.BoxGeometry(
+          (wallWidth - doorwayWidth) / 2,
+          wallHeight,
+          wallDepth
+        );
+        const rightWall = new THREE.Mesh(rightGeo, wallMat);
+        rightWall.position.set((wallWidth + doorwayWidth) / 4, wallHeight / 2, 0);
+        rightWall.userData.isWall = true;
+        wallGroup.add(rightWall);
+
+        // Top segment above doorway
+        const topGeo = new THREE.BoxGeometry(
+          wallWidth,
+          wallHeight - doorwayHeight,
+          wallDepth
+        );
+        const topWall = new THREE.Mesh(topGeo, wallMat);
+        topWall.position.set(0, (wallHeight + doorwayHeight) / 2, 0);
+        topWall.userData.isWall = true;
+        wallGroup.add(topWall);
+
+        return wallGroup;
+      }
+
+      // Front wall (facing +z into room)
+      const frontWall = createWallWithDoorway();
+      frontWall.position.set(0, 0, -10);
+      roomGroup.add(frontWall);
+
+      // Back wall
+      const backWall = createWallWithDoorway();
+      backWall.rotation.y = Math.PI;
+      backWall.position.set(0, 0, 10);
+      roomGroup.add(backWall);
+
+      // Left wall
+      const leftWall = createWallWithDoorway();
+      leftWall.rotation.y = Math.PI / 2;
+      leftWall.position.set(-10, 0, 0);
+      roomGroup.add(leftWall);
+
+      // Right wall
+      const rightWall = createWallWithDoorway();
+      rightWall.rotation.y = -Math.PI / 2;
+      rightWall.position.set(10, 0, 0);
+      roomGroup.add(rightWall);
+
+      // Register walls for collision
+      roomGroup.traverse((child) => {
+        if (child.userData && child.userData.isWall) {
+          wallSegments.push(child);
+        }
+      });
+
+      scene.add(roomGroup);
+      return roomGroup;
+    }
+
+    function buildWallBoxes() {
+      wallBoxes = [];
+      for (let i = 0; i < wallSegments.length; i++) {
+        const box = new THREE.Box3().setFromObject(wallSegments[i]);
+        wallBoxes.push(box);
+      }
+    }
+
+    // ===================== PAINTINGS =====================
+    function createPaintings() {
+      const loader = new THREE.TextureLoader();
+
+      // Where to put paintings (hard-coded spots around gallery).
+      // Each has: position + rotation Y.
+      const paintingSpots = [
+        // Center room walls
+        { pos: new THREE.Vector3(-8, 3.2, -1),   rotY: Math.PI / 2 },
+        { pos: new THREE.Vector3( 8, 3.2,  1),   rotY: -Math.PI / 2 },
+        { pos: new THREE.Vector3(-2, 3.2, -10.2), rotY: 0 },
+        { pos: new THREE.Vector3( 2, 3.2,  10.2), rotY: Math.PI },
+
+        // North room
+        { pos: new THREE.Vector3(-2, 3.2, -34.2), rotY: 0 },
+        { pos: new THREE.Vector3( 2, 3.2, -34.2), rotY: 0 },
+        { pos: new THREE.Vector3(-18, 3.2, -24),  rotY: Math.PI / 2 },
+
+        // South room
+        { pos: new THREE.Vector3(-2, 3.2, 34.2),  rotY: Math.PI },
+        { pos: new THREE.Vector3( 2, 3.2, 34.2),  rotY: Math.PI },
+        { pos: new THREE.Vector3(18, 3.2, 24),    rotY: -Math.PI / 2 },
+
+        // West / East rooms
+        { pos: new THREE.Vector3(-34.2, 3.2, -2), rotY: Math.PI / 2 },
+        { pos: new THREE.Vector3(-34.2, 3.2,  2), rotY: Math.PI / 2 },
+        { pos: new THREE.Vector3(34.2,  3.2, -2), rotY: -Math.PI / 2 },
+        { pos: new THREE.Vector3(34.2,  3.2,  2), rotY: -Math.PI / 2 }
+      ];
+
+      const shuffledConfigs = shuffleArray(paintingConfigs.slice());
+      const count = Math.min(shuffledConfigs.length, paintingSpots.length);
+
+      for (let i = 0; i < count; i++) {
+        const cfg = shuffledConfigs[i];
+        const spot = paintingSpots[i];
+
+        // Plane for painting
+        const g = new THREE.PlaneGeometry(cfg.size.width, cfg.size.height);
+        const m = new THREE.MeshLambertMaterial({ color: 0x777777 }); // fallback color
+
+        const paintingMesh = new THREE.Mesh(g, m);
+        paintingMesh.position.copy(spot.pos);
+        paintingMesh.rotation.y = spot.rotY;
+
+        paintingMesh.userData = {
+          id: cfg.id,
+          title: cfg.title,
+          archiveUrl: cfg.archiveUrl,
+          isTarget: false,
+          collected: false
+        };
+
+        // Optional simple frame: thin box behind painting
+        const frameGeo = new THREE.BoxGeometry(
+          cfg.size.width + 0.3,
+          cfg.size.height + 0.3,
+          0.15
+        );
+        const frameMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
+        const frameMesh = new THREE.Mesh(frameGeo, frameMat);
+        frameMesh.position.copy(spot.pos);
+        frameMesh.position.z -= 0.09 * Math.cos(spot.rotY);
+        frameMesh.position.x -= 0.09 * Math.sin(spot.rotY);
+
+        scene.add(frameMesh);
+        scene.add(paintingMesh);
+        paintings.push(paintingMesh);
+
+        // Load texture async
+        loader.load(
+          cfg.url,
+          function (tex) {
+            paintingMesh.material.map = tex;
+            paintingMesh.material.needsUpdate = true;
+          },
+          undefined,
+          function () {
+            // If load fails, at least you still see the gray painting
+            console.warn("Failed to load painting texture:", cfg.url);
+          }
+        );
+      }
+    }
+
+    function chooseTargets() {
+      // Randomly pick 3 distinct paintings from those actually placed
+      if (paintings.length === 0) return;
+
+      const indices = [];
+      for (let i = 0; i < paintings.length; i++) indices.push(i);
+      shuffleArray(indices);
+
+      targetPaintings = [];
+      collectedCount = 0;
+
+      for (let i = 0; i < totalTargets && i < indices.length; i++) {
+        const mesh = paintings[indices[i]];
+        mesh.userData.isTarget = true;
+        targetPaintings.push(mesh.userData);
+      }
+
+      updateProgressUI();
+    }
+
+    function setTargetsUI() {
+      targetsList.innerHTML = "";
+      for (let i = 0; i < targetPaintings.length; i++) {
+        const t = targetPaintings[i];
+        const li = document.createElement("li");
+        li.textContent = t.title + " (" + t.archiveUrl + ")";
+        targetsList.appendChild(li);
+      }
+    }
+
+    function updateProgressUI() {
+      progressDisplay.textContent = "Collected: " + collectedCount + " / " + totalTargets;
+    }
+
+    // ===================== INPUT & CAMERA =====================
+    function setupInput() {
+      document.addEventListener("keydown", function (e) {
+        keys[e.code] = true;
+      });
+
+      document.addEventListener("keyup", function (e) {
+        keys[e.code] = false;
+      });
+
+      // Mouse buttons
+      document.addEventListener("mousedown", function (e) {
+        if (e.button === 2) {
+          // Right mouse: hold to look around
+          isLooking = true;
+        }
+        if (e.button === 0) {
+          // Left click: try to collect painting
+          onLeftClick();
+        }
+      });
+
+      document.addEventListener("mouseup", function (e) {
+        if (e.button === 2) {
+          isLooking = false;
+        }
+      });
+
+      // Mouse move for look
+      document.addEventListener("mousemove", function (e) {
+        if (isLooking && gameStarted && !gameOver) {
+          yaw   -= e.movementX * lookSpeed;
+          pitch -= e.movementY * lookSpeed;
+
+          const maxPitch = Math.PI / 2 - 0.05;
+          if (pitch >  maxPitch) pitch =  maxPitch;
+          if (pitch < -maxPitch) pitch = -maxPitch;
+
+          camera.rotation.set(pitch, yaw, 0);
+        }
+      });
+
+      // prevent context menu (so right-click is free)
+      document.addEventListener("contextmenu", function (e) {
+        e.preventDefault();
+      });
+
+      // window resize
+      window.addEventListener("resize", onWindowResize);
+
+      // Start / Restart buttons
+      startBtn.addEventListener("click", function () {
+        if (!gameStarted) {
+          startGame();
+        }
+      });
+
+      restartBtn.addEventListener("click", function () {
+        window.location.reload();
+      });
+    }
+
+    function onLeftClick() {
+      if (!gameStarted || gameOver) return;
+
+      // Raycast from center of screen
+      const ndc = new THREE.Vector2(0, 0);
+      raycaster.setFromCamera(ndc, camera);
+
+      const candidates = paintings.filter((p) => !p.userData.collected);
+      const hits = raycaster.intersectObjects(candidates, false);
+
+      if (hits.length > 0) {
+        const mesh = hits[0].object;
+        const data = mesh.userData;
+
+        if (!data.collected) {
+          if (data.isTarget) {
+            data.collected = true;
+            collectedCount++;
+            updateProgressUI();
+
+            // simple feedback: fade painting
+            mesh.material.opacity = 0.3;
+            mesh.material.transparent = true;
+
+            if (collectedCount >= totalTargets) {
+              endGame(true);
+            }
+          } else {
+            // optional: feedback for non-target painting
+            // console.log("That painting is not one of tonight's targets.");
+          }
+        }
+      }
+    }
+
+    // ===================== MOVEMENT & COLLISION =====================
+    function updateMovement(delta) {
+      if (!gameStarted || gameOver) return;
+
+      const speed = moveSpeed * delta;
+
+      const forward = new THREE.Vector3(
+        Math.sin(yaw),
+        0,
+        -Math.cos(yaw)
+      );
+      const right = new THREE.Vector3(
+        Math.cos(yaw),
+        0,
+        Math.sin(yaw)
+      );
+
+      const movement = new THREE.Vector3();
+
+      if (keys["KeyW"] || keys["ArrowUp"]) {
+        movement.add(forward);
+      }
+      if (keys["KeyS"] || keys["ArrowDown"]) {
+        movement.sub(forward);
+      }
+      if (keys["KeyA"] || keys["ArrowLeft"]) {
+        movement.sub(right);
+      }
+      if (keys["KeyD"] || keys["ArrowRight"]) {
+        movement.add(right);
+      }
+
+      if (movement.lengthSq() > 0) {
+        movement.normalize().multiplyScalar(speed);
+        const proposed = camera.position.clone().add(movement);
+
+        // collision: bounding box for player
+        const playerBox = new THREE.Box3().setFromCenterAndSize(
+          new THREE.Vector3(proposed.x, 1.7, proposed.z),
+          new THREE.Vector3(1.0, 2.0, 1.0)
+        );
+
+        let blocked = false;
+        for (let i = 0; i < wallBoxes.length; i++) {
+          if (playerBox.intersectsBox(wallBoxes[i])) {
+            blocked = true;
+            break;
+          }
+        }
+
+        if (!blocked) {
+          camera.position.copy(proposed);
+        }
+      }
+    }
+
+    // ===================== TIMER & DARKNESS =====================
+    function startGame() {
+      gameStarted = true;
+      gameOver = false;
+      startTimeMs = performance.now();
+
+      centerOverlay.style.display = "none";
+    }
+
+    function updateTimer() {
+      if (!gameStarted || gameOver) return;
+
+      const now = performance.now();
+      const elapsed = (now - startTimeMs) / 1000;
+      const remaining = Math.max(0, GAME_DURATION - elapsed);
+
+      const minutes = Math.floor(remaining / 60);
+      const seconds = Math.floor(remaining % 60);
+      const secStr = seconds < 10 ? "0" + seconds : seconds.toString();
+      timerDisplay.textContent = "Time: " + minutes + ":" + secStr;
+
+      const t = 1 - remaining / GAME_DURATION; // 0 → 1
+      const alpha = Math.min(1, t * 1.25);
+      darkOverlay.style.background = "rgba(0,0,0," + alpha.toFixed(3) + ")";
+
+      if (remaining <= 0 && !gameOver) {
+        endGame(false);
+      }
+    }
+
+    function endGame(victory) {
+      gameOver = true;
+      gameStarted = false;
+
+      centerOverlay.style.display = "flex";
+      restartBtn.style.display = "inline-block";
+      startBtn.style.display = "none";
+      targetsList.innerHTML = "";
+
+      if (victory) {
+        centerTitle.textContent = "You found them!";
+        centerText.innerHTML =
+          "You collected all three target paintings before the gallery went completely dark. " +
+          "Here are the works you recovered (with their archive.org pages):";
+
+        const ul = document.createElement("ul");
+        ul.style.marginLeft = "16px";
+        for (let i = 0; i < targetPaintings.length; i++) {
+          const t = targetPaintings[i];
+          const li = document.createElement("li");
+          li.innerHTML =
+            "<b>" + t.title + "</b><br>" +
+            "<a href='" + t.archiveUrl + "' target='_blank'>" +
+            t.archiveUrl + "</a>";
+          ul.appendChild(li);
+        }
+        targetsList.replaceWith(ul); // simple reuse
+      } else {
+        centerTitle.textContent = "Lights Out!";
+        centerText.innerHTML =
+          "The power has fully shut down and the gallery is in complete darkness.<br>" +
+          "You did not collect all three paintings in time. Try another night shift?";
+      }
+    }
+
+    // ===================== RENDER LOOP =====================
+    let lastFrameTime = performance.now();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const now = performance.now();
+      const delta = (now - lastFrameTime) / 1000;
+      lastFrameTime = now;
+
+      updateMovement(delta);
+      updateTimer();
+
+      renderer.render(scene, camera);
+    }
+
+    // ===================== HELPERS =====================
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // ===================== START =====================
+    window.addEventListener("load", init);
+  </script>
+</body>
+</html>
