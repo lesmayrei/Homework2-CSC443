@@ -614,10 +614,16 @@
     function setupInput() {
       document.addEventListener("keydown", function (e) {
         keys[e.code] = true;
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
+          e.preventDefault();
+        }
       });
 
       document.addEventListener("keyup", function (e) {
         keys[e.code] = false;
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
+          e.preventDefault();
+        }
       });
 
       // Mouse buttons
@@ -732,10 +738,10 @@
       if (keys["KeyS"] || keys["ArrowDown"]) {
         movement.sub(forward);
       }
-      if (keys["KeyA"] || keys["ArrowLeft"]) {
+      if (keys["KeyA"]) {
         movement.sub(right);
       }
-      if (keys["KeyD"] || keys["ArrowRight"]) {
+      if (keys["KeyD"]) {
         movement.add(right);
       }
 
@@ -761,6 +767,24 @@
           camera.position.copy(proposed);
         }
       }
+    }
+
+    // ===================== ARROW-KEY ROTATION (classic style) =====================
+    function updateArrowRotation(delta) {
+      if (!gameStarted || gameOver) return;
+
+      const rotateSpeed = 1.8; // radians per second
+
+      // Left / Right arrows rotate the camera around the Y axis
+      if (keys["ArrowLeft"]) {
+        yaw += rotateSpeed * delta;
+      }
+      if (keys["ArrowRight"]) {
+        yaw -= rotateSpeed * delta;
+      }
+
+      // Apply the updated rotation
+      camera.rotation.set(pitch, yaw, 0);
     }
 
     // ===================== TIMER & DARKNESS =====================
@@ -838,9 +862,13 @@
       const delta = (now - lastFrameTime) / 1000;
       lastFrameTime = now;
 
-      updateMovement(delta);
-      updateTimer();
+      // Classic-style arrow rotation (A/B combined)
+      updateArrowRotation(delta);
 
+      // Modern FPS-style movement (WASD + ArrowUp/ArrowDown for forward/back)
+      updateMovement(delta);
+
+      updateTimer();
       renderer.render(scene, camera);
     }
 
