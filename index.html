@@ -135,8 +135,8 @@
     <div id="centerPanel">
       <h1 id="centerTitle">Brooklyn Museum Night Watch</h1>
       <p id="centerText">
-        You are the lone night guard in a small Brooklyn Museum gallery. Three works from the museum’s
-        online collection have been flagged for inspection, but the power is fading. You have just a few
+        You are the lone night guard in a small Brooklyn Museum gallery. Three art pieces from the museum’s
+         collection have been flagged for inspection, but the power is fading. You have just a few
         minutes to locate them before the gallery goes completely dark.
       </p>
       <p style="font-weight:600; margin-top:10px; margin-bottom:4px;">Tonight’s target paintings:</p>
@@ -155,6 +155,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
     // ===================== GLOBALS =====================
+let topDown = false;
+let savedCamPos = new THREE.Vector3();
+let savedYaw = 0;
+let savedPitch = 0;
+let savedFov = 75;
+
     let scene, camera, renderer;
     let wallSegments = [];
     let wallBoxes = [];
@@ -174,6 +180,8 @@
     let gameStarted = false;
     let gameOver = false;
     let startTimeMs = 0;
+    let pausedAtMs = 0;
+let isPausedForMap = false;
 
     // targets
     const totalTargets = 3;
@@ -370,36 +378,56 @@ rooms.push(createRoom(0, 0, wallpapers[0], {
   east:  true
 }));
 
-// North room: open on the side facing center (south side removed)
+// North room: 4 walls, only south wall has a doorway toward center
 rooms.push(createRoom(0, -20, wallpapers[1], {
   north: true,
-  south: false,  // no south wall here, center's north wall acts as the entrance
-  west:  true,
-  east:  true
-}));
-
-// South room: open on north side
-rooms.push(createRoom(0,  20, wallpapers[2], {
-  north: false,  // no north wall (open to center)
   south: true,
   west:  true,
-  east:  true
+  east:  true,
+
+  doorNorth: false,
+  doorWest:  false,
+  doorEast:  false,
+  doorSouth: true   // doorway toward center
 }));
 
-// West room: open on east side
+// South room: 4 walls, only north wall has a doorway toward center
+rooms.push(createRoom(0,  20, wallpapers[2], {
+  north: true,
+  south: true,
+  west:  true,
+  east:  true,
+
+  doorSouth: false,
+  doorWest:  false,
+  doorEast:  false,
+  doorNorth: true   // doorway toward center
+}));
+
+// West room: 4 walls, only east wall has a doorway toward center
 rooms.push(createRoom(-20, 0, wallpapers[3], {
   north: true,
   south: true,
   west:  true,
-  east:  false   // open towards center
+  east:  true,
+
+  doorNorth: false,
+  doorSouth: false,
+  doorWest:  false,
+  doorEast:  true   // doorway toward center
 }));
 
-// East room: open on west side
+// East room: 4 walls, only west wall has a doorway toward center
 rooms.push(createRoom( 20, 0, wallpapers[4], {
   north: true,
   south: true,
-  west:  false,  // open towards center
-  east:  true
+  west:  true,
+  east:  true,
+
+  doorNorth: false,
+  doorSouth: false,
+  doorEast:  false,
+  doorWest:  true   // doorway toward center
 }));
 
       // Lights roughly in center of each room
@@ -430,6 +458,58 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
       // Input & events
       setupInput();
       window.addEventListener("resize", onWindowResize);
+      document.addEventListener("keydown", function (e) {
+        if (e.code === "KeyM") { // press M to toggle map view
+          topDown = !topDown;
+
+          if (topDown) {
+            // save current view
+            savedCamPos.copy(camera.position);
+            savedYaw = yaw;
+            savedPitch = pitch;
+            savedFov = camera.fov;
+            isPausedForMap = true;
+            pausedAtMs = performance.now();
+
+            // ✅ disable darkness overlay in bird view
+            darkOverlay.style.background = "rgba(0,0,0,0)";
+
+            // widen view for map mode
+            camera.fov = 110;
+            camera.updateProjectionMatrix();
+
+            // move higher so we can see the whole layout
+            camera.position.set(0, 28, 0);
+            yaw = 0;
+            pitch = -Math.PI / 2 + 0.01;
+            camera.rotation.set(pitch, yaw, 0);
+
+            // hide ceiling so we can see inside
+            ceiling.visible = false;
+          } else {
+            if (isPausedForMap) {
+                const pausedDuration = performance.now() - pausedAtMs;
+                startTimeMs += pausedDuration;
+            }
+            isPausedForMap = false;
+            // restore normal view
+            camera.position.copy(savedCamPos);
+            yaw = savedYaw;
+            pitch = savedPitch;
+            camera.rotation.set(pitch, yaw, 0);
+
+            // restore FOV
+            camera.fov = savedFov;
+            camera.updateProjectionMatrix();
+
+            // show ceiling again
+            ceiling.visible = true;
+
+            // ✅ re-enable darkness overlay (timer controls it again)
+            darkOverlay.style.background = "";
+          }
+        }
+      });
 
       // Start render loop
       animate();
@@ -451,10 +531,25 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
   const hasWest  = open.west  !== false; // x = -10
   const hasEast  = open.east  !== false; // x = +10
 
+  // Whether each wall should include a doorway opening (defaults: true)
+  const doorNorth = open.doorNorth !== false;
+  const doorSouth = open.doorSouth !== false;
+  const doorWest  = open.doorWest  !== false;
+  const doorEast  = open.doorEast  !== false;
+
   // material using the wallpaper texture
   const wallMat = new THREE.MeshLambertMaterial({
     map: wallpaperTexture
   });
+
+  // Helper: solid wall (no doorway)
+  function createSolidWall() {
+    const solidGeo = new THREE.BoxGeometry(wallWidth, wallHeight, wallDepth);
+    const solidWall = new THREE.Mesh(solidGeo, wallMat);
+    solidWall.position.set(0, wallHeight / 2, 0);
+    solidWall.userData.isWall = true;
+    return solidWall;
+  }
 
   // Helper: doorway wall made of 3 segments
   function createWallWithDoorway() {
@@ -500,14 +595,14 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
 
   // Front wall (north, facing into room from negative Z)
   if (hasNorth) {
-    const frontWall = createWallWithDoorway();
+    const frontWall = doorNorth ? createWallWithDoorway() : createSolidWall();
     frontWall.position.set(0, 0, -10);
     roomGroup.add(frontWall);
   }
 
   // Back wall (south, positive Z)
   if (hasSouth) {
-    const backWall = createWallWithDoorway();
+    const backWall = doorSouth ? createWallWithDoorway() : createSolidWall();
     backWall.rotation.y = Math.PI;
     backWall.position.set(0, 0, 10);
     roomGroup.add(backWall);
@@ -515,7 +610,7 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
 
   // Left wall (west, negative X)
   if (hasWest) {
-    const leftWall = createWallWithDoorway();
+    const leftWall = doorWest ? createWallWithDoorway() : createSolidWall();
     leftWall.rotation.y = Math.PI / 2;
     leftWall.position.set(-10, 0, 0);
     roomGroup.add(leftWall);
@@ -523,7 +618,7 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
 
   // Right wall (east, positive X)
   if (hasEast) {
-    const rightWall = createWallWithDoorway();
+    const rightWall = doorEast ? createWallWithDoorway() : createSolidWall();
     rightWall.rotation.y = -Math.PI / 2;
     rightWall.position.set(10, 0, 0);
     roomGroup.add(rightWall);
@@ -548,6 +643,9 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
   const width = 6;
   const height = 8;
   const depth = length;
+  // Leave a gap at each end so hallway walls don't block room doorways
+  const endGap = 2.8;
+  const wallLen = Math.max(0.1, depth - endGap * 2);
 
   const wallMat = new THREE.MeshLambertMaterial({ map: wallpaperTexture });
 
@@ -569,7 +667,7 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
   hallway.add(ceiling);
 
   // Side walls
-  const wallGeo = new THREE.BoxGeometry(depth, height, 0.4);
+  const wallGeo = new THREE.BoxGeometry(wallLen, height, 0.4);
 
   const leftWall = new THREE.Mesh(wallGeo, wallMat);
   leftWall.position.set(-width / 2, height / 2, 0);
@@ -594,6 +692,7 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
   });
 
   scene.add(hallway);
+}
 
     function buildWallBoxes() {
       wallBoxes = [];
@@ -610,27 +709,35 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
       // Where to put paintings (hard-coded spots around gallery).
       // Each has: position + rotation Y.
       const paintingSpots = [
-        // Center room walls
-        { pos: new THREE.Vector3(-8, 3.2, -1),   rotY: Math.PI / 2 },
-        { pos: new THREE.Vector3( 8, 3.2,  1),   rotY: -Math.PI / 2 },
-        { pos: new THREE.Vector3(-2, 3.2, -10.2), rotY: 0 },
-        { pos: new THREE.Vector3( 2, 3.2,  10.2), rotY: Math.PI },
+        // ===== Center room (walls are at z = -10/+10 and x = -10/+10)
+        // Put paintings offset from the doorway opening so they don't peek through.
+        { pos: new THREE.Vector3(-8, 3.2, -9.8),  rotY: 0 },          // center north wall (left side)
+        { pos: new THREE.Vector3( 8, 3.2, -9.8),  rotY: 0 },          // center north wall (right side)
+        { pos: new THREE.Vector3(-8, 3.2,  9.8),  rotY: Math.PI },    // center south wall (left side)
+        { pos: new THREE.Vector3( 8, 3.2,  9.8),  rotY: Math.PI },    // center south wall (right side)
 
-        // North room
-        { pos: new THREE.Vector3(-2, 3.2, -34.2), rotY: 0 },
-        { pos: new THREE.Vector3( 2, 3.2, -34.2), rotY: 0 },
-        { pos: new THREE.Vector3(-18, 3.2, -24),  rotY: Math.PI / 2 },
+        // ===== North room (centered at z = -20; north wall is z = -30)
+        // Keep paintings on solid walls (NOT the south doorway wall).
+        { pos: new THREE.Vector3(-8, 3.2, -28.8),  rotY: 0 },          // north wall (pulled inside)
+        { pos: new THREE.Vector3( 8, 3.2, -28.8),  rotY: 0 },          // north wall (pulled inside)
+        { pos: new THREE.Vector3(-8.8, 3.2, -22), rotY: Math.PI / 2 }, // west wall, facing east (inside)
+        { pos: new THREE.Vector3(-2.8, 3.2, -19.8), rotY: 0 }, // doorway wall frame, facing north
 
-        // South room
-        { pos: new THREE.Vector3(-2, 3.2, 34.2),  rotY: Math.PI },
-        { pos: new THREE.Vector3( 2, 3.2, 34.2),  rotY: Math.PI },
-        { pos: new THREE.Vector3(18, 3.2, 24),    rotY: -Math.PI / 2 },
+        // ===== South room (centered at z = +20; south wall is z = +30)
+        // Keep paintings on solid walls (NOT the north doorway wall).
+        { pos: new THREE.Vector3(-8, 3.2,  29.8),  rotY: Math.PI },    // south wall
+        { pos: new THREE.Vector3( 8, 3.2,  29.8),  rotY: Math.PI },    // south wall
+        { pos: new THREE.Vector3( 9.8, 3.2,  22), rotY: -Math.PI / 2 }, // east wall (inside)
 
-        // West / East rooms
-        { pos: new THREE.Vector3(-34.2, 3.2, -2), rotY: Math.PI / 2 },
-        { pos: new THREE.Vector3(-34.2, 3.2,  2), rotY: Math.PI / 2 },
-        { pos: new THREE.Vector3(34.2,  3.2, -2), rotY: -Math.PI / 2 },
-        { pos: new THREE.Vector3(34.2,  3.2,  2), rotY: -Math.PI / 2 }
+        // ===== West room (centered at x = -20; west wall is x = -30)
+        // Keep paintings on solid walls (NOT the east doorway wall).
+        { pos: new THREE.Vector3(-29.8, 3.2, -8),  rotY: Math.PI / 2 }, // west wall
+        { pos: new THREE.Vector3(-29.8, 3.2,  8),  rotY: Math.PI / 2 }, // west wall
+
+        // ===== East room (centered at x = +20; east wall is x = +30)
+        // Keep paintings on solid walls (NOT the west doorway wall).
+        { pos: new THREE.Vector3( 29.8, 3.2, -8),  rotY: -Math.PI / 2 }, // east wall
+        { pos: new THREE.Vector3( 29.8, 3.2,  8),  rotY: -Math.PI / 2 }  // east wall
       ];
 
       const shuffledConfigs = shuffleArray(paintingConfigs.slice());
@@ -665,8 +772,12 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
         const frameMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
         const frameMesh = new THREE.Mesh(frameGeo, frameMat);
         frameMesh.position.copy(spot.pos);
-        frameMesh.position.z -= 0.09 * Math.cos(spot.rotY);
-        frameMesh.position.x -= 0.09 * Math.sin(spot.rotY);
+
+        // Offset the frame slightly toward the wall (behind the painting)
+        const nx = Math.sin(spot.rotY);
+        const nz = Math.cos(spot.rotY);
+        frameMesh.position.x -= nx * 0.09;
+        frameMesh.position.z -= nz * 0.09;
 
         scene.add(frameMesh);
         scene.add(paintingMesh);
@@ -828,6 +939,7 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
     // ===================== MOVEMENT & COLLISION =====================
     function updateMovement(delta) {
       if (!gameStarted || gameOver) return;
+      if (topDown) return;
 
       const speed = moveSpeed * delta;
 
@@ -884,6 +996,7 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
     // ===================== ARROW-KEY ROTATION (classic style) =====================
     function updateArrowRotation(delta) {
       if (!gameStarted || gameOver) return;
+      if (topDown) return;
 
       const rotateSpeed = 1.8; // radians per second
 
@@ -910,6 +1023,7 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
 
     function updateTimer() {
       if (!gameStarted || gameOver) return;
+      if (isPausedForMap) return;
 
       const now = performance.now();
       const elapsed = (now - startTimeMs) / 1000;
