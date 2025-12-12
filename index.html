@@ -155,6 +155,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
     // ===================== GLOBALS =====================
+    let topDown = false;
+    let savedCamPos = new THREE.Vector3();
+    let savedYaw = 0;
+    let savedPitch = 0;
+
     let scene, camera, renderer;
     let wallSegments = [];
     let wallBoxes = [];
@@ -594,6 +599,7 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
   });
 
   scene.add(hallway);
+}
 
     function buildWallBoxes() {
       wallBoxes = [];
