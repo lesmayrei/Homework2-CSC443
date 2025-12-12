@@ -562,7 +562,7 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
   function createWallWithDoorway() {
     const wallGroup = new THREE.Group();
     const doorwayWidth = 5.5;
-    const doorwayHeight = 5;
+    const doorwayHeight = 6.5;
 
     // Left segment - only visual, no collision
     const leftGeo = new THREE.BoxGeometry(
@@ -589,11 +589,11 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     // Top segment above doorway - has collision
     const topGeo = new THREE.BoxGeometry(
       wallWidth,
-      wallHeight - doorwayHeight,
+      wallHeight - doorwayHeight - 0.5,
       wallDepth
     );
     const topWall = new THREE.Mesh(topGeo, wallMat);
-    topWall.position.set(0, (wallHeight + doorwayHeight) / 2, 0);
+    topWall.position.set(0, (wallHeight + doorwayHeight) / 2 + 0.25, 0);
     topWall.userData.isWall = true; // Top still has collision
     wallGroup.add(topWall);
 
@@ -705,30 +705,26 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
 }
 
     function buildWallBoxes() {
-      wallBoxes = [];
-      const SHRINK = 0.05; // meters: small tolerance
+  wallBoxes = [];
+  const SHRINK = 0.05;
 
-      for (let i = 0; i < wallSegments.length; i++) {
-        const seg = wallSegments[i];
-        if (!seg || !seg.userData) continue;
+  for (const seg of wallSegments) {
+    if (!seg.userData?.isWall) continue;
 
-        // Only create collision boxes for things flagged as walls
-        if (!seg.userData.isWall) continue;
+    // 🔑 FORCE world matrix update
+    seg.updateWorldMatrix(true, false);
 
-        const box = new THREE.Box3().setFromObject(seg);
-        try {
-          box.expandByScalar(-SHRINK);
-        } catch (e) {
-          // expandByScalar might not be present in some builds; ignore if so
-        }
+    seg.geometry.computeBoundingBox();
 
-        wallBoxes.push(box);
+    const box = seg.geometry.boundingBox.clone();
+    box.applyMatrix4(seg.matrixWorld);
+    box.expandByScalar(-SHRINK);
 
-        // DEBUG: Visualize collision boxes (commented out)
-        // const helper = new THREE.Box3Helper(box, 0xff0000);
-        // scene.add(helper);
-      }
-    }
+    wallBoxes.push(box);
+
+    
+  }
+}
 
     // ===================== PAINTINGS =====================
     function createPaintings() {
