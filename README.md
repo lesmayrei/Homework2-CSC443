@@ -1,5 +1,4 @@
 # Homework2-CSC443
-Maze Homework
 
 Instructions : Due Date: Friday, December 12, 2025
 
