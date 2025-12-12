@@ -943,29 +943,28 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
 
       const speed = moveSpeed * delta;
 
-      const forward = new THREE.Vector3(
-        Math.sin(yaw),
-        0,
-        -Math.cos(yaw)
-      );
-      const right = new THREE.Vector3(
-        Math.cos(yaw),
-        0,
-        Math.sin(yaw)
-      );
+      // Compute forward/right from the camera's world direction so movement
+      // always follows where the camera is actually facing (robust to order/sign issues).
+      const forward = new THREE.Vector3();
+      camera.getWorldDirection(forward); // points in camera's -Z direction
+      forward.y = 0;
+      forward.normalize();
+
+      const right = new THREE.Vector3();
+      right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
 
       const movement = new THREE.Vector3();
 
-      if (keys["KeyW"] || keys["ArrowUp"]) {
+      if (keys["KeyW"]) {
         movement.add(forward);
       }
-      if (keys["KeyS"] || keys["ArrowDown"]) {
+      if (keys["KeyS"]) {
         movement.sub(forward);
       }
-      if (keys["KeyA"] || keys["ArrowLeft"]) {
+      if (keys["KeyA"]) {
         movement.sub(right);
       }
-      if (keys["KeyD"] || keys["ArrowRight"]) {
+      if (keys["KeyD"]) {
         movement.add(right);
       }
 
