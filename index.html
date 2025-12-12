@@ -372,12 +372,17 @@ createHallway( 10, 0, 8, "x", wallpapers[4]); // Center → East
 // Create rooms in a plus shape: center + 4 around
 const rooms = [];
 
-// Center room: all four walls
+// Center room: all four walls with doorways
 rooms.push(createRoom(0, 0, wallpapers[0], {
   north: true,
   south: true,
   west:  true,
-  east:  true
+  east:  true,
+  
+  doorNorth: true,
+  doorSouth: true,
+  doorWest:  true,
+  doorEast:  true
 }));
 
 // North room: 4 walls, only south wall has a doorway toward center
@@ -387,9 +392,9 @@ rooms.push(createRoom(0, -20, wallpapers[1], {
   west:  true,
   east:  true,
 
-  doorNorth: true,
-  doorWest:  true,
-  doorEast:  true,
+  doorNorth: false,
+  doorWest:  false,
+  doorEast:  false,
   doorSouth: true   // doorway toward center
 }));
 
@@ -400,9 +405,9 @@ rooms.push(createRoom(0,  20, wallpapers[2], {
   west:  true,
   east:  true,
 
-  doorSouth: true,
-  doorWest:  true,
-  doorEast:  true,
+  doorSouth: false,
+  doorWest:  false,
+  doorEast:  false,
   doorNorth: true   // doorway toward center
 }));
 
@@ -559,7 +564,7 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     const doorwayWidth = 5.5;
     const doorwayHeight = 5;
 
-    // Left segment
+    // Left segment - only visual, no collision
     const leftGeo = new THREE.BoxGeometry(
       (wallWidth - doorwayWidth) / 2,
       wallHeight,
@@ -567,10 +572,10 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     );
     const leftWall = new THREE.Mesh(leftGeo, wallMat);
     leftWall.position.set(-(wallWidth + doorwayWidth) / 4, wallHeight / 2, 0);
-    leftWall.userData.isWall = true;
+    leftWall.userData.isWall = false; // No collision for left side
     wallGroup.add(leftWall);
 
-    // Right segment
+    // Right segment - only visual, no collision
     const rightGeo = new THREE.BoxGeometry(
       (wallWidth - doorwayWidth) / 2,
       wallHeight,
@@ -578,10 +583,10 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     );
     const rightWall = new THREE.Mesh(rightGeo, wallMat);
     rightWall.position.set((wallWidth + doorwayWidth) / 4, wallHeight / 2, 0);
-    rightWall.userData.isWall = true;
+    rightWall.userData.isWall = false; // No collision for right side
     wallGroup.add(rightWall);
 
-    // Top segment above doorway
+    // Top segment above doorway - has collision
     const topGeo = new THREE.BoxGeometry(
       wallWidth,
       wallHeight - doorwayHeight,
@@ -589,7 +594,7 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     );
     const topWall = new THREE.Mesh(topGeo, wallMat);
     topWall.position.set(0, (wallHeight + doorwayHeight) / 2, 0);
-    topWall.userData.isWall = true;
+    topWall.userData.isWall = true; // Top still has collision
     wallGroup.add(topWall);
 
     return wallGroup;
@@ -626,9 +631,9 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     roomGroup.add(rightWall);
   }
 
-  // Register walls for collision
+  // Register walls for collision - only add actual meshes, not groups
   roomGroup.traverse((child) => {
-    if (child.userData && child.userData.isWall) {
+    if (child instanceof THREE.Mesh && child.userData && child.userData.isWall) {
       wallSegments.push(child);
     }
   });
@@ -669,18 +674,18 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
   ceiling.position.y = height;
   hallway.add(ceiling);
 
-  // Side walls
+  // Side walls - no collision, just visual guides
   const wallGeo = new THREE.BoxGeometry(wallLen, height, 0.4);
 
   const leftWall = new THREE.Mesh(wallGeo, wallMat);
   leftWall.position.set(-width / 2, height / 2, 0);
   leftWall.rotation.y = Math.PI / 2;
-  leftWall.userData.isWall = true;
+  leftWall.userData.isWall = false; // No collision for hallway walls
 
   const rightWall = new THREE.Mesh(wallGeo, wallMat);
   rightWall.position.set(width / 2, height / 2, 0);
   rightWall.rotation.y = Math.PI / 2;
-  rightWall.userData.isWall = true;
+  rightWall.userData.isWall = false; // No collision for hallway walls
 
   hallway.add(leftWall);
   hallway.add(rightWall);
@@ -691,7 +696,9 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
   }
 
   hallway.traverse(obj => {
-    if (obj.userData.isWall) wallSegments.push(obj);
+    if (obj instanceof THREE.Mesh && obj.userData.isWall) {
+      wallSegments.push(obj);
+    }
   });
 
   scene.add(hallway);
@@ -699,7 +706,7 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
 
     function buildWallBoxes() {
       wallBoxes = [];
-      for (let i = 0; i < wallSegments.length; i++) {
+      for (let i = 0; i < wallSegments.length; i++) { images
         const box = new THREE.Box3().setFromObject(wallSegments[i]);
         // Shrink AABB slightly to avoid axis-aligned bounding boxes
         // from rotated/combined geometry blocking narrow doorways.
@@ -710,6 +717,16 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
           // if expandByScalar isn't available, fall back to no-op
         }
         wallBoxes.push(box);
+        // Only add collision box if isWall is true
+        if (wallSegments[i].userData.isWall) {
+          const box = new THREE.Box3().setFromObject(wallSegments[i]);
+          wallBoxes.push(box);
+
+          // DEBUG: Visualize collision boxes (commented out for testing)
+          // const helper = new THREE.Box3Helper(box, 0xff0000); // Red wireframe
+          // scene.add(helper);
+        }
+main
       }
     }
 
@@ -720,35 +737,25 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
       // Where to put paintings (hard-coded spots around gallery).
       // Each has: position + rotation Y.
       const paintingSpots = [
-        // ===== Center room (walls are at z = -10/+10 and x = -10/+10)
-        // Put paintings offset from the doorway opening so they don't peek through.
-        { pos: new THREE.Vector3(-8, 3.2, -9.8),  rotY: 0 },          // center north wall (left side)
-        { pos: new THREE.Vector3( 8, 3.2, -9.8),  rotY: 0 },          // center north wall (right side)
-        { pos: new THREE.Vector3(-8, 3.2,  9.8),  rotY: Math.PI },    // center south wall (left side)
-        { pos: new THREE.Vector3( 8, 3.2,  9.8),  rotY: Math.PI },    // center south wall (right side)
+        // ===== Center room (2 paintings on opposite walls, offset left and right)
+        { pos: new THREE.Vector3(-8, 3.2, -9.8),  rotY: 0 },          // north wall (left)
+        { pos: new THREE.Vector3( 8, 3.2,  9.8),  rotY: Math.PI },    // south wall (right)
 
-        // ===== North room (centered at z = -20; north wall is z = -30)
-        // Keep paintings on solid walls (NOT the south doorway wall).
-        { pos: new THREE.Vector3(-8, 3.2, -28.8),  rotY: 0 },          // north wall (pulled inside)
-        { pos: new THREE.Vector3( 8, 3.2, -28.8),  rotY: 0 },          // north wall (pulled inside)
-        { pos: new THREE.Vector3(-8.8, 3.2, -22), rotY: Math.PI / 2 }, // west wall, facing east (inside)
-        { pos: new THREE.Vector3(-2.8, 3.2, -19.8), rotY: 0 }, // doorway wall frame, facing north
+        // ===== North room (2 paintings on opposite walls, same pattern)
+        { pos: new THREE.Vector3(-8, 3.2, -28.8),  rotY: 0 },         // north wall (left)
+        { pos: new THREE.Vector3( 8, 3.2,  -9.8),  rotY: Math.PI },   // south wall (right)
 
-        // ===== South room (centered at z = +20; south wall is z = +30)
-        // Keep paintings on solid walls (NOT the north doorway wall).
-        { pos: new THREE.Vector3(-8, 3.2,  29.8),  rotY: Math.PI },    // south wall
-        { pos: new THREE.Vector3( 8, 3.2,  29.8),  rotY: Math.PI },    // south wall
-        { pos: new THREE.Vector3( 9.8, 3.2,  22), rotY: -Math.PI / 2 }, // east wall (inside)
+        // ===== South room (2 paintings on opposite walls, same pattern)
+        { pos: new THREE.Vector3(-8, 3.2,  29.8),  rotY: Math.PI },   // south wall (left)
+        { pos: new THREE.Vector3( 8, 3.2,   9.8),  rotY: 0 },         // north wall (right)
 
-        // ===== West room (centered at x = -20; west wall is x = -30)
-        // Keep paintings on solid walls (NOT the east doorway wall).
-        { pos: new THREE.Vector3(-29.8, 3.2, -8),  rotY: Math.PI / 2 }, // west wall
-        { pos: new THREE.Vector3(-29.8, 3.2,  8),  rotY: Math.PI / 2 }, // west wall
+        // ===== West room (2 paintings on opposite walls, same pattern)
+        { pos: new THREE.Vector3(-28.8, 3.2, -8),  rotY: Math.PI / 2 },  // west wall (left)
+        { pos: new THREE.Vector3(  -9.8, 3.2,  8),  rotY: -Math.PI / 2 }, // east wall (right)
 
-        // ===== East room (centered at x = +20; east wall is x = +30)
-        // Keep paintings on solid walls (NOT the west doorway wall).
-        { pos: new THREE.Vector3( 29.8, 3.2, -8),  rotY: -Math.PI / 2 }, // east wall
-        { pos: new THREE.Vector3( 29.8, 3.2,  8),  rotY: -Math.PI / 2 }  // east wall
+        // ===== East room (2 paintings on opposite walls, same pattern)
+        { pos: new THREE.Vector3( 29.8, 3.2, -8),  rotY: -Math.PI / 2 }, // east wall (left)
+        { pos: new THREE.Vector3(   9.8, 3.2,  8),  rotY: Math.PI / 2 }   // west wall (right)
       ];
 
       const shuffledConfigs = shuffleArray(paintingConfigs.slice());
@@ -765,6 +772,12 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
         const paintingMesh = new THREE.Mesh(g, m);
         paintingMesh.position.copy(spot.pos);
         paintingMesh.rotation.y = spot.rotY;
+        
+        // Offset painting in front of the wall
+        const nx = Math.sin(spot.rotY);
+        const nz = Math.cos(spot.rotY);
+        paintingMesh.position.x += nx * 0.04;
+        paintingMesh.position.z += nz * 0.04;
 
         paintingMesh.userData = {
           id: cfg.id,
@@ -774,23 +787,6 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
           collected: false
         };
 
-        // Optional simple frame: thin box behind painting
-        const frameGeo = new THREE.BoxGeometry(
-          cfg.size.width + 0.3,
-          cfg.size.height + 0.3,
-          0.15
-        );
-        const frameMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
-        const frameMesh = new THREE.Mesh(frameGeo, frameMat);
-        frameMesh.position.copy(spot.pos);
-
-        // Offset the frame slightly toward the wall (behind the painting)
-        const nx = Math.sin(spot.rotY);
-        const nz = Math.cos(spot.rotY);
-        frameMesh.position.x -= nx * 0.09;
-        frameMesh.position.z -= nz * 0.09;
-
-        scene.add(frameMesh);
         scene.add(paintingMesh);
         paintings.push(paintingMesh);
 
