@@ -118,19 +118,12 @@
 </head>
 <body>
 
-  <!-- HUD -->
   <div id="hud">
     <span id="timerDisplay">Time: 03:00</span>
     <span id="progressDisplay">Collected: 0 / 3</span>
   </div>
-
-  <!-- Darkness overlay -->
   <div id="darkOverlay"></div>
-
-  <!-- Simple crosshair -->
   <div id="crosshair"></div>
-
-  <!-- Center overlay for intro / win / lose -->
   <div id="centerOverlay">
     <div id="centerPanel">
       <h1 id="centerTitle">Brooklyn Museum Night Watch</h1>
@@ -151,10 +144,8 @@
     </div>
   </div>
 
-  <!-- Three.js r128 (same version as the professor’s example) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
-    // ===================== GLOBALS =====================
 let topDown = false;
 let savedCamPos = new THREE.Vector3();
 let savedYaw = 0;
@@ -166,31 +157,26 @@ let savedFov = 75;
     let wallBoxes = [];
     let paintings = [];
     let raycaster = new THREE.Raycaster();
-    // Debugging toggle for movement/collision
     let movementDebug = false;
 
-    // player / camera
     const keys = {};
     let yaw = 0;
     let pitch = 0;
-    const moveSpeed = 6.0;     // units per second
+    const moveSpeed = 6.0;     
     const lookSpeed = 0.002;
-    let isLooking = false;     // right mouse held?
+    let isLooking = false;      
 
-    // game / timer
-    const GAME_DURATION = 180; // seconds (~3 minutes)
+    const GAME_DURATION = 180; 
     let gameStarted = false;
     let gameOver = false;
     let startTimeMs = 0;
     let pausedAtMs = 0;
 let isPausedForMap = false;
 
-    // targets
     const totalTargets = 3;
-    let targetPaintings = [];   // painting config objects
+    let targetPaintings = [];   
     let collectedCount = 0;
 
-    // DOM
     const timerDisplay    = document.getElementById("timerDisplay");
     const progressDisplay = document.getElementById("progressDisplay");
     const darkOverlay     = document.getElementById("darkOverlay");
@@ -201,9 +187,6 @@ let isPausedForMap = false;
     const startBtn        = document.getElementById("startBtn");
     const restartBtn      = document.getElementById("restartBtn");
 
-    // ===================== PAINTING DATA (TODOs) =====================
-    // You can keep these as TODOs for now.
-    // Later, replace url + archiveUrl with real Brooklyn Museum images / links.
     const paintingConfigs = [
       {
         id: "painting_1",
@@ -277,7 +260,6 @@ let isPausedForMap = false;
       }
     ];
 
-    // ===================== UTILS =====================
     function getRandomOffsets(count, min, max, spacing) {
       const offsets = [];
       let attempts = 0;
@@ -301,7 +283,6 @@ let isPausedForMap = false;
       return arr;
     }
 
-    // Procedural "vintage" wallpaper texture (no external file needed)
     function createWallpaperTexture(baseColor, stripeColor) {
       const size = 256;
       const canvas = document.createElement("canvas");
@@ -329,7 +310,6 @@ let isPausedForMap = false;
       return texture;
     }
 
-    // ===================== SCENE SETUP =====================
     function init() {
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0x05070d);
@@ -341,7 +321,7 @@ let isPausedForMap = false;
         0.1,
         200
       );
-      camera.position.set(0, 1.7, 0); // start in center room
+      camera.position.set(0, 1.7, 0);
       camera.rotation.order = "YXZ";
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -349,11 +329,9 @@ let isPausedForMap = false;
       renderer.shadowMap.enabled = true;
       document.body.appendChild(renderer.domElement);
 
-      // Lighting: ambient + 1 point light per room
       const ambient = new THREE.AmbientLight(0xffffff, 0.35);
       scene.add(ambient);
 
-      // Floor & ceiling for whole gallery
       const floorGeo = new THREE.PlaneGeometry(80, 80);
       const floorMat = new THREE.MeshLambertMaterial({ color: 0x202124 });
       const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -368,7 +346,6 @@ let isPausedForMap = false;
       ceiling.position.y = 6.5;
       scene.add(ceiling);
 
-      // Five different wallpaper textures
       const wallpapers = [
         createWallpaperTexture("#2e2626", "#5c3b3b"),
         createWallpaperTexture("#222835", "#3b4a66"),
@@ -377,17 +354,12 @@ let isPausedForMap = false;
         createWallpaperTexture("#2c2620", "#62503b")
       ];
 
-      // Create rooms in a plus shape: center + 4 around
-
-      // Hallways connecting the 5 rooms
-createHallway(0, -10, 8, "z", wallpapers[1]); // Center → North
-createHallway(0,  10, 8, "z", wallpapers[2]); // Center → South
-createHallway(-10, 0, 8, "x", wallpapers[3]); // Center → West
-createHallway( 10, 0, 8, "x", wallpapers[4]); // Center → East
-// Create rooms in a plus shape: center + 4 around
+createHallway(0, -10, 8, "z", wallpapers[1]); 
+createHallway(0,  10, 8, "z", wallpapers[2]); 
+createHallway(-10, 0, 8, "x", wallpapers[3]); 
+createHallway( 10, 0, 8, "x", wallpapers[4]); 
 const rooms = [];
 
-// Center room: all four walls with doorways
 rooms.push(createRoom(0, 0, wallpapers[0], {
   north: true,
   south: true,
@@ -400,7 +372,6 @@ rooms.push(createRoom(0, 0, wallpapers[0], {
   doorEast:  true
 }));
 
-// North room: 4 walls, only south wall has a doorway toward center
 rooms.push(createRoom(0, -20, wallpapers[1], {
   north: true,
   south: true,
@@ -410,10 +381,9 @@ rooms.push(createRoom(0, -20, wallpapers[1], {
   doorNorth: false,
   doorWest:  false,
   doorEast:  false,
-  doorSouth: true   // doorway toward center
+  doorSouth: true   
 }));
 
-// South room: 4 walls, only north wall has a doorway toward center
 rooms.push(createRoom(0,  20, wallpapers[2], {
   north: true,
   south: true,
@@ -423,10 +393,9 @@ rooms.push(createRoom(0,  20, wallpapers[2], {
   doorSouth: false,
   doorWest:  false,
   doorEast:  false,
-  doorNorth: true   // doorway toward center
+  doorNorth: true   
 }));
 
-// West room: 4 walls, only east wall has a doorway toward center
 rooms.push(createRoom(-20, 0, wallpapers[3], {
   north: true,
   south: true,
@@ -436,10 +405,9 @@ rooms.push(createRoom(-20, 0, wallpapers[3], {
   doorNorth: false,
   doorSouth: false,
   doorWest:  false,
-  doorEast:  true   // doorway toward center
+  doorEast:  true   
 }));
 
-// East room: 4 walls, only west wall has a doorway toward center
 rooms.push(createRoom( 20, 0, wallpapers[4], {
   north: true,
   south: true,
@@ -449,10 +417,9 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
   doorNorth: false,
   doorSouth: false,
   doorEast:  false,
-  doorWest:  true   // doorway toward center
+  doorWest:  true   
 }));
 
-      // Lights roughly in center of each room
       const lightPositions = [
         new THREE.Vector3(0,    5.8,  0),
         new THREE.Vector3(0,    5.8, -24),
@@ -469,23 +436,19 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
         scene.add(pLight);
       }
 
-      // Build wall bounding boxes once
       buildWallBoxes();
 
-      // Create paintings & targets
       createPaintings();
       chooseTargets();
       setTargetsUI();
 
-      // Input & events
       setupInput();
       window.addEventListener("resize", onWindowResize);
       document.addEventListener("keydown", function (e) {
-        if (e.code === "KeyM") { // press M to toggle map view
+        if (e.code === "KeyM") { // use M for bird's eye view feature
           topDown = !topDown;
 
           if (topDown) {
-            // save current view
             savedCamPos.copy(camera.position);
             savedYaw = yaw;
             savedPitch = pitch;
@@ -493,20 +456,16 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
             isPausedForMap = true;
             pausedAtMs = performance.now();
 
-            // ✅ disable darkness overlay in bird view
             darkOverlay.style.background = "rgba(0,0,0,0)";
 
-            // widen view for map mode
             camera.fov = 110;
             camera.updateProjectionMatrix();
 
-            // move higher so we can see the whole layout
             camera.position.set(0, 28, 0);
             yaw = 0;
             pitch = -Math.PI / 2 + 0.01;
             camera.rotation.set(pitch, yaw, 0);
 
-            // hide ceiling so we can see inside
             ceiling.visible = false;
           } else {
             if (isPausedForMap) {
@@ -514,57 +473,47 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
                 startTimeMs += pausedDuration;
             }
             isPausedForMap = false;
-            // restore normal view
             camera.position.copy(savedCamPos);
             yaw = savedYaw;
             pitch = savedPitch;
             camera.rotation.set(pitch, yaw, 0);
 
-            // restore FOV
             camera.fov = savedFov;
             camera.updateProjectionMatrix();
 
-            // show ceiling again
             ceiling.visible = true;
 
-            // ✅ re-enable darkness overlay (timer controls it again)
             darkOverlay.style.background = "";
           }
         }
       });
 
-      // Start render loop
       animate();
     }
 
-    // Create one rectangular room with doorways on all four sides
    function createRoom(cx, cz, wallpaperTexture, config) {
   const roomGroup = new THREE.Group();
   roomGroup.position.set(cx, 0, cz);
 
-  const wallWidth  = 20; // along x
+  const wallWidth  = 20; 
   const wallHeight = 12;
   const wallDepth  = 0.4;
 
-  // Which sides should have walls? (defaults: all true)
   const open = config || {};
-  const hasNorth = open.north !== false; // z = -10
-  const hasSouth = open.south !== false; // z = +10
-  const hasWest  = open.west  !== false; // x = -10
-  const hasEast  = open.east  !== false; // x = +10
+  const hasNorth = open.north !== false; 
+  const hasSouth = open.south !== false; 
+  const hasWest  = open.west  !== false; 
+  const hasEast  = open.east  !== false; 
 
-  // Whether each wall should include a doorway opening (defaults: true)
   const doorNorth = open.doorNorth !== false;
   const doorSouth = open.doorSouth !== false;
   const doorWest  = open.doorWest  !== false;
   const doorEast  = open.doorEast  !== false;
 
-  // material using the wallpaper texture
   const wallMat = new THREE.MeshLambertMaterial({
     map: wallpaperTexture
   });
 
-  // Helper: solid wall (no doorway)
   function createSolidWall() {
     const solidGeo = new THREE.BoxGeometry(wallWidth, wallHeight, wallDepth);
     const solidWall = new THREE.Mesh(solidGeo, wallMat);
@@ -573,13 +522,11 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     return solidWall;
   }
 
-  // Helper: doorway wall made of 3 segments
   function createWallWithDoorway() {
     const wallGroup = new THREE.Group();
     const doorwayWidth = 5.5;
     const doorwayHeight = 5;
 
-    // Left segment - only visual, no collision
     const leftGeo = new THREE.BoxGeometry(
       (wallWidth - doorwayWidth) / 2,
       wallHeight,
@@ -587,10 +534,9 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     );
     const leftWall = new THREE.Mesh(leftGeo, wallMat);
     leftWall.position.set(-(wallWidth + doorwayWidth) / 4, wallHeight / 2, 0);
-    leftWall.userData.isWall = false; // No collision for left side
+    leftWall.userData.isWall = false; 
     wallGroup.add(leftWall);
 
-    // Right segment - only visual, no collision
     const rightGeo = new THREE.BoxGeometry(
       (wallWidth - doorwayWidth) / 2,
       wallHeight,
@@ -598,10 +544,9 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     );
     const rightWall = new THREE.Mesh(rightGeo, wallMat);
     rightWall.position.set((wallWidth + doorwayWidth) / 4, wallHeight / 2, 0);
-    rightWall.userData.isWall = false; // No collision for right side
+    rightWall.userData.isWall = false; 
     wallGroup.add(rightWall);
 
-    // Top segment above doorway - has collision
     const topGeo = new THREE.BoxGeometry(
       wallWidth,
       wallHeight - doorwayHeight,
@@ -609,20 +554,18 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     );
     const topWall = new THREE.Mesh(topGeo, wallMat);
     topWall.position.set(0, (wallHeight + doorwayHeight) / 2, 0);
-    topWall.userData.isWall = true; // Top still has collision
+    topWall.userData.isWall = true; 
     wallGroup.add(topWall);
 
     return wallGroup;
   }
 
-  // Front wall (north, facing into room from negative Z)
   if (hasNorth) {
     const frontWall = doorNorth ? createWallWithDoorway() : createSolidWall();
     frontWall.position.set(0, 0, -10);
     roomGroup.add(frontWall);
   }
 
-  // Back wall (south, positive Z)
   if (hasSouth) {
     const backWall = doorSouth ? createWallWithDoorway() : createSolidWall();
     backWall.rotation.y = Math.PI;
@@ -630,7 +573,6 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     roomGroup.add(backWall);
   }
 
-  // Left wall (west, negative X)
   if (hasWest) {
     const leftWall = doorWest ? createWallWithDoorway() : createSolidWall();
     leftWall.rotation.y = Math.PI / 2;
@@ -638,7 +580,6 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     roomGroup.add(leftWall);
   }
 
-  // Right wall (east, positive X)
   if (hasEast) {
     const rightWall = doorEast ? createWallWithDoorway() : createSolidWall();
     rightWall.rotation.y = -Math.PI / 2;
@@ -646,7 +587,6 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     roomGroup.add(rightWall);
   }
 
-  // Register walls for collision - only add actual meshes, not groups
   roomGroup.traverse((child) => {
     if (child instanceof THREE.Mesh && child.userData && child.userData.isWall) {
       wallSegments.push(child);
@@ -657,7 +597,6 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
   return roomGroup;
 }
 
-// ===================== HALLWAYS =====================
 function createHallway(cx, cz, length, orientation, wallpaperTexture) {
   const hallway = new THREE.Group();
   hallway.position.set(cx, 0, cz);
@@ -665,14 +604,11 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
   const width = 6;
   const height = 8;
   const depth = length;
-  // Leave a small gap at each end so hallway walls don't block room doorways
-  // Reduced from 2.8 to 1.0 so hallways align more closely with room door openings.
   const endGap = 1.0;
   const wallLen = Math.max(0.1, depth - endGap * 2);
 
   const wallMat = new THREE.MeshLambertMaterial({ map: wallpaperTexture });
 
-  // Floor
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(width, depth),
     new THREE.MeshLambertMaterial({ color: 0x202124 })
@@ -680,7 +616,6 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
   floor.rotation.x = -Math.PI / 2;
   hallway.add(floor);
 
-  // Ceiling
   const ceiling = new THREE.Mesh(
     new THREE.PlaneGeometry(width, depth),
     new THREE.MeshLambertMaterial({ color: 0x0f1014 })
@@ -689,23 +624,21 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
   ceiling.position.y = height;
   hallway.add(ceiling);
 
-  // Side walls - no collision, just visual guides
   const wallGeo = new THREE.BoxGeometry(wallLen, height, 0.4);
 
   const leftWall = new THREE.Mesh(wallGeo, wallMat);
   leftWall.position.set(-width / 2, height / 2, 0);
   leftWall.rotation.y = Math.PI / 2;
-  leftWall.userData.isWall = false; // No collision for hallway walls
+  leftWall.userData.isWall = false; 
 
   const rightWall = new THREE.Mesh(wallGeo, wallMat);
   rightWall.position.set(width / 2, height / 2, 0);
   rightWall.rotation.y = Math.PI / 2;
-  rightWall.userData.isWall = false; // No collision for hallway walls
+  rightWall.userData.isWall = false; 
 
   hallway.add(leftWall);
   hallway.add(rightWall);
 
-  // Rotate east/west hallways
   if (orientation === "x") {
     hallway.rotation.y = Math.PI / 2;
   }
@@ -726,7 +659,6 @@ function buildWallBoxes() {
   for (const seg of wallSegments) {
     if (!seg.userData?.isWall) continue;
 
-    // 🔑 FORCE world matrix update
     seg.updateWorldMatrix(true, false);
 
     seg.geometry.computeBoundingBox();
@@ -737,18 +669,14 @@ function buildWallBoxes() {
 
     wallBoxes.push(box);
 
-    // DEBUG (optional)
-    // scene.add(new THREE.Box3Helper(box, 0x00ff00));
   }
 }
 
-    // ===================== PAINTINGS =====================
 function createPaintings() {
   const loader = new THREE.TextureLoader();
 
   const shuffledConfigs = shuffleArray(paintingConfigs.slice());
 
-  // ⬇️⬇️⬇️ ADD THIS BLOCK HERE ⬇️⬇️⬇️
   const validWalls = [
     { axis: "x", fixed: -29.6, rotY: 0 },
     { axis: "x", fixed:  29.6, rotY: Math.PI },
@@ -800,7 +728,6 @@ function createPaintings() {
       paintingMesh.position.copy(pos);
       paintingMesh.rotation.y = wall.rotY;
 
-      // offset slightly off the wall
       const nx = Math.sin(wall.rotY);
       const nz = Math.cos(wall.rotY);
       paintingMesh.position.x += nx * 0.04;
@@ -829,7 +756,6 @@ function createPaintings() {
 
 
     function chooseTargets() {
-      // Randomly pick 3 distinct paintings from those actually placed
       if (paintings.length === 0) return;
 
       const indices = [];
@@ -867,11 +793,9 @@ function createPaintings() {
       progressDisplay.textContent = "Collected: " + collectedCount + " / " + totalTargets;
     }
 
-    // ===================== INPUT & CAMERA =====================
     function setupInput() {
       document.addEventListener("keydown", function (e) {
         keys[e.code] = true;
-        // Toggle movement debug logging with 'B'
         if (e.code === "KeyB") {
           movementDebug = !movementDebug;
           console.log("movementDebug:", movementDebug);
@@ -888,14 +812,11 @@ function createPaintings() {
         }
       });
 
-      // Mouse buttons
       document.addEventListener("mousedown", function (e) {
         if (e.button === 2) {
-          // Right mouse: hold to look around
           isLooking = true;
         }
         if (e.button === 0) {
-          // Left click: try to collect painting
           onLeftClick();
         }
       });
@@ -906,7 +827,6 @@ function createPaintings() {
         }
       });
 
-      // Mouse move for look
       document.addEventListener("mousemove", function (e) {
         if (isLooking && gameStarted && !gameOver) {
           yaw   -= e.movementX * lookSpeed;
@@ -920,15 +840,12 @@ function createPaintings() {
         }
       });
 
-      // prevent context menu (so right-click is free)
       document.addEventListener("contextmenu", function (e) {
         e.preventDefault();
       });
 
-      // window resize
       window.addEventListener("resize", onWindowResize);
 
-      // Start / Restart buttons
       startBtn.addEventListener("click", function () {
         if (!gameStarted) {
           startGame();
@@ -943,7 +860,6 @@ function createPaintings() {
     function onLeftClick() {
       if (!gameStarted || gameOver) return;
 
-      // Raycast from center of screen
       const ndc = new THREE.Vector2(0, 0);
       raycaster.setFromCamera(ndc, camera);
 
@@ -960,7 +876,6 @@ function createPaintings() {
             collectedCount++;
             updateProgressUI();
 
-            // simple feedback: fade painting
             mesh.material.opacity = 0.3;
             mesh.material.transparent = true;
 
@@ -968,24 +883,19 @@ function createPaintings() {
               endGame(true);
             }
           } else {
-            // optional: feedback for non-target painting
-            // console.log("That painting is not one of tonight's targets.");
           }
         }
       }
     }
 
-    // ===================== MOVEMENT & COLLISION =====================
     function updateMovement(delta) {
       if (!gameStarted || gameOver) return;
       if (topDown) return;
 
       const speed = moveSpeed * delta;
 
-      // Compute forward/right from the camera's world direction so movement
-      // always follows where the camera is actually facing (robust to order/sign issues).
       const forward = new THREE.Vector3();
-      camera.getWorldDirection(forward); // points in camera's -Z direction
+      camera.getWorldDirection(forward); 
       forward.y = 0;
       forward.normalize();
 
@@ -1011,7 +921,6 @@ function createPaintings() {
         movement.normalize().multiplyScalar(speed);
         const proposed = camera.position.clone().add(movement);
 
-        // collision: bounding box for player
         const playerBox = new THREE.Box3().setFromCenterAndSize(
           new THREE.Vector3(proposed.x, 1.7, proposed.z),
           new THREE.Vector3(1.0, 2.0, 1.0)
@@ -1044,14 +953,12 @@ function createPaintings() {
       }
     }
 
-    // ===================== ARROW-KEY ROTATION (classic style) =====================
     function updateArrowRotation(delta) {
       if (!gameStarted || gameOver) return;
       if (topDown) return;
 
-      const rotateSpeed = 1.8; // radians per second
+      const rotateSpeed = 1.8; 
 
-      // Left / Right arrows rotate the camera around the Y axis
       if (keys["ArrowLeft"]) {
         yaw += rotateSpeed * delta;
       }
@@ -1059,11 +966,9 @@ function createPaintings() {
         yaw -= rotateSpeed * delta;
       }
 
-      // Apply the updated rotation
       camera.rotation.set(pitch, yaw, 0);
     }
 
-    // ===================== TIMER & DARKNESS =====================
     function startGame() {
       gameStarted = true;
       gameOver = false;
@@ -1085,7 +990,7 @@ function createPaintings() {
       const secStr = seconds < 10 ? "0" + seconds : seconds.toString();
       timerDisplay.textContent = "Time: " + minutes + ":" + secStr;
 
-      const t = 1 - remaining / GAME_DURATION; // 0 → 1
+      const t = 1 - remaining / GAME_DURATION;
       const alpha = Math.min(1, t * 0.8);
       darkOverlay.style.background = "rgba(0,0,0," + alpha.toFixed(3) + ")";
 
@@ -1120,7 +1025,7 @@ function createPaintings() {
             t.archiveUrl + "</a>";
           ul.appendChild(li);
         }
-        targetsList.replaceWith(ul); // simple reuse
+        targetsList.replaceWith(ul); 
       } else {
         centerTitle.textContent = "Lights Out!";
         centerText.innerHTML =
@@ -1129,7 +1034,6 @@ function createPaintings() {
       }
     }
 
-    // ===================== RENDER LOOP =====================
     let lastFrameTime = performance.now();
 
     function animate() {
@@ -1139,24 +1043,20 @@ function createPaintings() {
       const delta = (now - lastFrameTime) / 1000;
       lastFrameTime = now;
 
-      // Classic-style arrow rotation (A/B combined)
       updateArrowRotation(delta);
 
-      // Modern FPS-style movement (WASD + ArrowUp/ArrowDown for forward/back)
       updateMovement(delta);
 
       updateTimer();
       renderer.render(scene, camera);
     }
 
-    // ===================== HELPERS =====================
     function onWindowResize() {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    // ===================== START =====================
     window.addEventListener("load", init);
   </script>
 </body>
