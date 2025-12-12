@@ -436,29 +436,35 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
       setupInput();
       window.addEventListener("resize", onWindowResize);
       document.addEventListener("keydown", function (e) {
-  if (e.code === "KeyM") { // press M to toggle map view
-    topDown = !topDown;
+        if (e.code === "KeyM") { // press M to toggle map view
+          topDown = !topDown;
 
-    if (topDown) {
-      // save current view
-      savedCamPos.copy(camera.position);
-      savedYaw = yaw;
-      savedPitch = pitch;
+          if (topDown) {
+            // save current view
+            savedCamPos.copy(camera.position);
+            savedYaw = yaw;
+            savedPitch = pitch;
 
-      // go high above the layout and look straight down
-      camera.position.set(0, 60, 0);
-      yaw = 0;
-      pitch = -Math.PI / 2 + 0.01;   // almost straight down
-      camera.rotation.set(pitch, yaw, 0);
-    } else {
-      // restore normal view
-      camera.position.copy(savedCamPos);
-      yaw = savedYaw;
-      pitch = savedPitch;
-      camera.rotation.set(pitch, yaw, 0);
-    }
-  }
-});
+            // ✅ disable darkness overlay in bird view
+            darkOverlay.style.background = "rgba(0,0,0,0)";
+
+            // go to bird view
+            camera.position.set(0, 6.2, 0);
+            yaw = 0;
+            pitch = -Math.PI / 2 + 0.01;
+            camera.rotation.set(pitch, yaw, 0);
+          } else {
+            // restore normal view
+            camera.position.copy(savedCamPos);
+            yaw = savedYaw;
+            pitch = savedPitch;
+            camera.rotation.set(pitch, yaw, 0);
+
+            // ✅ re‑enable darkness overlay (timer controls it again)
+            darkOverlay.style.background = "";
+          }
+        }
+      });
 
       // Start render loop
       animate();
