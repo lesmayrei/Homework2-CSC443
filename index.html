@@ -278,6 +278,21 @@ let isPausedForMap = false;
     ];
 
     // ===================== UTILS =====================
+    function getRandomOffsets(count, min, max, spacing) {
+      const offsets = [];
+      let attempts = 0;
+
+      while (offsets.length < count && attempts < 500) {
+        const v = THREE.MathUtils.randFloat(min, max);
+        if (offsets.every(o => Math.abs(o - v) >= spacing)) {
+          offsets.push(v);
+        }
+        attempts++;
+      }
+      return offsets;
+    }
+
+    
     function shuffleArray(arr) {
       for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -562,7 +577,7 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
   function createWallWithDoorway() {
     const wallGroup = new THREE.Group();
     const doorwayWidth = 5.5;
-    const doorwayHeight = 6.5;
+    const doorwayHeight = 5;
 
     // Left segment - only visual, no collision
     const leftGeo = new THREE.BoxGeometry(
@@ -589,11 +604,11 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
     // Top segment above doorway - has collision
     const topGeo = new THREE.BoxGeometry(
       wallWidth,
-      wallHeight - doorwayHeight - 0.5,
+      wallHeight - doorwayHeight,
       wallDepth
     );
     const topWall = new THREE.Mesh(topGeo, wallMat);
-    topWall.position.set(0, (wallHeight + doorwayHeight) / 2 + 0.25, 0);
+    topWall.position.set(0, (wallHeight + doorwayHeight) / 2, 0);
     topWall.userData.isWall = true; // Top still has collision
     wallGroup.add(topWall);
 
@@ -704,7 +719,7 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
   scene.add(hallway);
 }
 
-    function buildWallBoxes() {
+function buildWallBoxes() {
   wallBoxes = [];
   const SHRINK = 0.05;
 
@@ -722,85 +737,96 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
 
     wallBoxes.push(box);
 
-    
+    // DEBUG (optional)
+    // scene.add(new THREE.Box3Helper(box, 0x00ff00));
   }
 }
 
     // ===================== PAINTINGS =====================
-    function createPaintings() {
-      const loader = new THREE.TextureLoader();
+function createPaintings() {
+  const loader = new THREE.TextureLoader();
 
-      // Where to put paintings (hard-coded spots around gallery).
-      // Each has: position + rotation Y.
-      const paintingSpots = [
-        // ===== Center room (2 paintings on opposite walls, offset left and right)
-        { pos: new THREE.Vector3(-8, 3.2, -9.8),  rotY: 0 },          // north wall (left)
-        { pos: new THREE.Vector3( 8, 3.2,  9.8),  rotY: Math.PI },    // south wall (right)
+  const shuffledConfigs = shuffleArray(paintingConfigs.slice());
 
-        // ===== North room (2 paintings on opposite walls, same pattern)
-        { pos: new THREE.Vector3(-8, 3.2, -28.8),  rotY: 0 },         // north wall (left)
-        { pos: new THREE.Vector3( 8, 3.2,  -9.8),  rotY: Math.PI },   // south wall (right)
+  // ⬇️⬇️⬇️ ADD THIS BLOCK HERE ⬇️⬇️⬇️
+  const validWalls = [
+    { axis: "x", fixed: -29.6, rotY: 0 },
+    { axis: "x", fixed:  29.6, rotY: Math.PI },
+    { axis: "z", fixed: -29.6, rotY: Math.PI / 2 },
+    { axis: "z", fixed:  29.6, rotY: -Math.PI / 2 }
+  ];
 
-        // ===== South room (2 paintings on opposite walls, same pattern)
-        { pos: new THREE.Vector3(-8, 3.2,  29.8),  rotY: Math.PI },   // south wall (left)
-        { pos: new THREE.Vector3( 8, 3.2,   9.8),  rotY: 0 },         // north wall (right)
+  const DISPLAY_COUNT = 10;
+  const spacing = 4.8;
+  const wallSpan = 7.5;
 
-        // ===== West room (2 paintings on opposite walls, same pattern)
-        { pos: new THREE.Vector3(-28.8, 3.2, -8),  rotY: Math.PI / 2 },  // west wall (left)
-        { pos: new THREE.Vector3(  -9.8, 3.2,  8),  rotY: -Math.PI / 2 }, // east wall (right)
+  let placed = 0;
 
-        // ===== East room (2 paintings on opposite walls, same pattern)
-        { pos: new THREE.Vector3( 29.8, 3.2, -8),  rotY: -Math.PI / 2 }, // east wall (left)
-        { pos: new THREE.Vector3(   9.8, 3.2,  8),  rotY: Math.PI / 2 }   // west wall (right)
-      ];
+  for (const wall of shuffleArray(validWalls.slice())) {
+    if (placed >= DISPLAY_COUNT) break;
 
-      const shuffledConfigs = shuffleArray(paintingConfigs.slice());
-      const count = Math.min(shuffledConfigs.length, paintingSpots.length);
+    const remaining = DISPLAY_COUNT - placed;
+    const countOnWall = Math.min(
+      remaining,
+      THREE.MathUtils.randInt(2, 3)
+    );
 
-      for (let i = 0; i < count; i++) {
-        const cfg = shuffledConfigs[i];
-        const spot = paintingSpots[i];
+    const offsets = getRandomOffsets(
+      countOnWall,
+      -wallSpan,
+       wallSpan,
+       spacing
+    );
 
-        // Plane for painting
-        const g = new THREE.PlaneGeometry(cfg.size.width, cfg.size.height);
-        const m = new THREE.MeshLambertMaterial({ color: 0x777777 }); // fallback color
+    for (const offset of offsets) {
+      if (placed >= DISPLAY_COUNT) break;
 
-        const paintingMesh = new THREE.Mesh(g, m);
-        paintingMesh.position.copy(spot.pos);
-        paintingMesh.rotation.y = spot.rotY;
-        
-        // Offset painting in front of the wall
-        const nx = Math.sin(spot.rotY);
-        const nz = Math.cos(spot.rotY);
-        paintingMesh.position.x += nx * 0.04;
-        paintingMesh.position.z += nz * 0.04;
+      const cfg = shuffledConfigs[placed];
 
-        paintingMesh.userData = {
-          id: cfg.id,
-          title: cfg.title,
-          archiveUrl: cfg.archiveUrl,
-          isTarget: false,
-          collected: false
-        };
+      const g = new THREE.PlaneGeometry(cfg.size.width, cfg.size.height);
+      const m = new THREE.MeshLambertMaterial({ color: 0x777777 });
+      const paintingMesh = new THREE.Mesh(g, m);
 
-        scene.add(paintingMesh);
-        paintings.push(paintingMesh);
+      const pos = new THREE.Vector3(0, 3.2, 0);
 
-        // Load texture async
-        loader.load(
-          cfg.url,
-          function (tex) {
-            paintingMesh.material.map = tex;
-            paintingMesh.material.needsUpdate = true;
-          },
-          undefined,
-          function () {
-            // If load fails, at least you still see the gray painting
-            console.warn("Failed to load painting texture:", cfg.url);
-          }
-        );
+      if (wall.axis === "x") {
+        pos.x = offset;
+        pos.z = wall.fixed;
+      } else {
+        pos.x = wall.fixed;
+        pos.z = offset;
       }
+
+      paintingMesh.position.copy(pos);
+      paintingMesh.rotation.y = wall.rotY;
+
+      // offset slightly off the wall
+      const nx = Math.sin(wall.rotY);
+      const nz = Math.cos(wall.rotY);
+      paintingMesh.position.x += nx * 0.04;
+      paintingMesh.position.z += nz * 0.04;
+
+      paintingMesh.userData = {
+        id: cfg.id,
+        title: cfg.title,
+        archiveUrl: cfg.archiveUrl,
+        isTarget: false,
+        collected: false
+      };
+
+      scene.add(paintingMesh);
+      paintings.push(paintingMesh);
+
+      loader.load(cfg.url, tex => {
+        paintingMesh.material.map = tex;
+        paintingMesh.material.needsUpdate = true;
+      });
+
+      placed++;
     }
+  }
+}
+
 
     function chooseTargets() {
       // Randomly pick 3 distinct paintings from those actually placed
