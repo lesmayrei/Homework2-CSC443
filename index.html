@@ -528,7 +528,7 @@ rooms.push(createRoom( 20, 0, wallpapers[4], {
   roomGroup.position.set(cx, 0, cz);
 
   const wallWidth  = 20; // along x
-  const wallHeight = 8;
+  const wallHeight = 12;
   const wallDepth  = 0.4;
 
   // Which sides should have walls? (defaults: all true)
@@ -706,27 +706,27 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
 
     function buildWallBoxes() {
       wallBoxes = [];
-      for (let i = 0; i < wallSegments.length; i++) { images
-        const box = new THREE.Box3().setFromObject(wallSegments[i]);
-        // Shrink AABB slightly to avoid axis-aligned bounding boxes
-        // from rotated/combined geometry blocking narrow doorways.
+      const SHRINK = 0.05; // meters: small tolerance
+
+      for (let i = 0; i < wallSegments.length; i++) {
+        const seg = wallSegments[i];
+        if (!seg || !seg.userData) continue;
+
+        // Only create collision boxes for things flagged as walls
+        if (!seg.userData.isWall) continue;
+
+        const box = new THREE.Box3().setFromObject(seg);
         try {
-          const SHRINK = 0.05; // meters: small tolerance
           box.expandByScalar(-SHRINK);
         } catch (e) {
-          // if expandByScalar isn't available, fall back to no-op
+          // expandByScalar might not be present in some builds; ignore if so
         }
-        wallBoxes.push(box);
-        // Only add collision box if isWall is true
-        if (wallSegments[i].userData.isWall) {
-          const box = new THREE.Box3().setFromObject(wallSegments[i]);
-          wallBoxes.push(box);
 
-          // DEBUG: Visualize collision boxes (commented out for testing)
-          // const helper = new THREE.Box3Helper(box, 0xff0000); // Red wireframe
-          // scene.add(helper);
-        }
-main
+        wallBoxes.push(box);
+
+        // DEBUG: Visualize collision boxes (commented out)
+        // const helper = new THREE.Box3Helper(box, 0xff0000);
+        // scene.add(helper);
       }
     }
 
