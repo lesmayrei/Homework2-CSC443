@@ -645,8 +645,9 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
   const width = 6;
   const height = 8;
   const depth = length;
-  // Leave a gap at each end so hallway walls don't block room doorways
-  const endGap = 2.8;
+  // Leave a small gap at each end so hallway walls don't block room doorways
+  // Reduced from 2.8 to 1.0 so hallways align more closely with room door openings.
+  const endGap = 1.0;
   const wallLen = Math.max(0.1, depth - endGap * 2);
 
   const wallMat = new THREE.MeshLambertMaterial({ map: wallpaperTexture });
@@ -700,6 +701,14 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
       wallBoxes = [];
       for (let i = 0; i < wallSegments.length; i++) {
         const box = new THREE.Box3().setFromObject(wallSegments[i]);
+        // Shrink AABB slightly to avoid axis-aligned bounding boxes
+        // from rotated/combined geometry blocking narrow doorways.
+        try {
+          const SHRINK = 0.05; // meters: small tolerance
+          box.expandByScalar(-SHRINK);
+        } catch (e) {
+          // if expandByScalar isn't available, fall back to no-op
+        }
         wallBoxes.push(box);
       }
     }
@@ -826,7 +835,12 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
       for (let i = 0; i < targetPaintings.length; i++) {
         const t = targetPaintings[i];
         const li = document.createElement("li");
-        li.textContent = t.title + " (" + t.archiveUrl + ")";
+        const a = document.createElement("a");
+        a.href = t.archiveUrl || "#";
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = t.title || t.archiveUrl || "Link";
+        li.appendChild(a);
         targetsList.appendChild(li);
       }
     }
