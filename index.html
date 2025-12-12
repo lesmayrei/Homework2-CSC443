@@ -353,12 +353,54 @@
       ];
 
       // Create rooms in a plus shape: center + 4 around
-      const rooms = [];
-      rooms.push(createRoom(0, 0, wallpapers[0]));     // center
-      rooms.push(createRoom(0, -24, wallpapers[1]));   // north
-      rooms.push(createRoom(0,  24, wallpapers[2]));   // south
-      rooms.push(createRoom(-24, 0, wallpapers[3]));   // west
-      rooms.push(createRoom( 24, 0, wallpapers[4]));   // east
+
+      // Hallways connecting the 5 rooms
+createHallway(0, -10, 8, "z", wallpapers[1]); // Center → North
+createHallway(0,  10, 8, "z", wallpapers[2]); // Center → South
+createHallway(-10, 0, 8, "x", wallpapers[3]); // Center → West
+createHallway( 10, 0, 8, "x", wallpapers[4]); // Center → East
+// Create rooms in a plus shape: center + 4 around
+const rooms = [];
+
+// Center room: all four walls
+rooms.push(createRoom(0, 0, wallpapers[0], {
+  north: true,
+  south: true,
+  west:  true,
+  east:  true
+}));
+
+// North room: open on the side facing center (south side removed)
+rooms.push(createRoom(0, -20, wallpapers[1], {
+  north: true,
+  south: false,  // no south wall here, center's north wall acts as the entrance
+  west:  true,
+  east:  true
+}));
+
+// South room: open on north side
+rooms.push(createRoom(0,  20, wallpapers[2], {
+  north: false,  // no north wall (open to center)
+  south: true,
+  west:  true,
+  east:  true
+}));
+
+// West room: open on east side
+rooms.push(createRoom(-20, 0, wallpapers[3], {
+  north: true,
+  south: true,
+  west:  true,
+  east:  false   // open towards center
+}));
+
+// East room: open on west side
+rooms.push(createRoom( 20, 0, wallpapers[4], {
+  north: true,
+  south: true,
+  west:  false,  // open towards center
+  east:  true
+}));
 
       // Lights roughly in center of each room
       const lightPositions = [
@@ -394,94 +436,164 @@
     }
 
     // Create one rectangular room with doorways on all four sides
-    function createRoom(cx, cz, wallpaperTexture) {
-      const roomGroup = new THREE.Group();
-      roomGroup.position.set(cx, 0, cz);
+   function createRoom(cx, cz, wallpaperTexture, config) {
+  const roomGroup = new THREE.Group();
+  roomGroup.position.set(cx, 0, cz);
 
-      const wallWidth  = 20; // along x
-      const wallHeight = 8;
-      const wallDepth  = 0.4;
+  const wallWidth  = 20; // along x
+  const wallHeight = 8;
+  const wallDepth  = 0.4;
 
-      // material using the wallpaper texture
-      const wallMat = new THREE.MeshLambertMaterial({
-        map: wallpaperTexture
-      });
+  // Which sides should have walls? (defaults: all true)
+  const open = config || {};
+  const hasNorth = open.north !== false; // z = -10
+  const hasSouth = open.south !== false; // z = +10
+  const hasWest  = open.west  !== false; // x = -10
+  const hasEast  = open.east  !== false; // x = +10
 
-      // Helper: replicate professor's doorway wall
-      function createWallWithDoorway() {
-        const wallGroup = new THREE.Group();
-        const doorwayWidth = 4;
-        const doorwayHeight = 5;
+  // material using the wallpaper texture
+  const wallMat = new THREE.MeshLambertMaterial({
+    map: wallpaperTexture
+  });
 
-        // Left segment
-        const leftGeo = new THREE.BoxGeometry(
-          (wallWidth - doorwayWidth) / 2,
-          wallHeight,
-          wallDepth
-        );
-        const leftWall = new THREE.Mesh(leftGeo, wallMat);
-        leftWall.position.set(-(wallWidth + doorwayWidth) / 4, wallHeight / 2, 0);
-        leftWall.userData.isWall = true;
-        wallGroup.add(leftWall);
+  // Helper: doorway wall made of 3 segments
+  function createWallWithDoorway() {
+    const wallGroup = new THREE.Group();
+    const doorwayWidth = 5.5;
+    const doorwayHeight = 5;
 
-        // Right segment
-        const rightGeo = new THREE.BoxGeometry(
-          (wallWidth - doorwayWidth) / 2,
-          wallHeight,
-          wallDepth
-        );
-        const rightWall = new THREE.Mesh(rightGeo, wallMat);
-        rightWall.position.set((wallWidth + doorwayWidth) / 4, wallHeight / 2, 0);
-        rightWall.userData.isWall = true;
-        wallGroup.add(rightWall);
+    // Left segment
+    const leftGeo = new THREE.BoxGeometry(
+      (wallWidth - doorwayWidth) / 2,
+      wallHeight,
+      wallDepth
+    );
+    const leftWall = new THREE.Mesh(leftGeo, wallMat);
+    leftWall.position.set(-(wallWidth + doorwayWidth) / 4, wallHeight / 2, 0);
+    leftWall.userData.isWall = true;
+    wallGroup.add(leftWall);
 
-        // Top segment above doorway
-        const topGeo = new THREE.BoxGeometry(
-          wallWidth,
-          wallHeight - doorwayHeight,
-          wallDepth
-        );
-        const topWall = new THREE.Mesh(topGeo, wallMat);
-        topWall.position.set(0, (wallHeight + doorwayHeight) / 2, 0);
-        topWall.userData.isWall = true;
-        wallGroup.add(topWall);
+    // Right segment
+    const rightGeo = new THREE.BoxGeometry(
+      (wallWidth - doorwayWidth) / 2,
+      wallHeight,
+      wallDepth
+    );
+    const rightWall = new THREE.Mesh(rightGeo, wallMat);
+    rightWall.position.set((wallWidth + doorwayWidth) / 4, wallHeight / 2, 0);
+    rightWall.userData.isWall = true;
+    wallGroup.add(rightWall);
 
-        return wallGroup;
-      }
+    // Top segment above doorway
+    const topGeo = new THREE.BoxGeometry(
+      wallWidth,
+      wallHeight - doorwayHeight,
+      wallDepth
+    );
+    const topWall = new THREE.Mesh(topGeo, wallMat);
+    topWall.position.set(0, (wallHeight + doorwayHeight) / 2, 0);
+    topWall.userData.isWall = true;
+    wallGroup.add(topWall);
 
-      // Front wall (facing +z into room)
-      const frontWall = createWallWithDoorway();
-      frontWall.position.set(0, 0, -10);
-      roomGroup.add(frontWall);
+    return wallGroup;
+  }
 
-      // Back wall
-      const backWall = createWallWithDoorway();
-      backWall.rotation.y = Math.PI;
-      backWall.position.set(0, 0, 10);
-      roomGroup.add(backWall);
+  // Front wall (north, facing into room from negative Z)
+  if (hasNorth) {
+    const frontWall = createWallWithDoorway();
+    frontWall.position.set(0, 0, -10);
+    roomGroup.add(frontWall);
+  }
 
-      // Left wall
-      const leftWall = createWallWithDoorway();
-      leftWall.rotation.y = Math.PI / 2;
-      leftWall.position.set(-10, 0, 0);
-      roomGroup.add(leftWall);
+  // Back wall (south, positive Z)
+  if (hasSouth) {
+    const backWall = createWallWithDoorway();
+    backWall.rotation.y = Math.PI;
+    backWall.position.set(0, 0, 10);
+    roomGroup.add(backWall);
+  }
 
-      // Right wall
-      const rightWall = createWallWithDoorway();
-      rightWall.rotation.y = -Math.PI / 2;
-      rightWall.position.set(10, 0, 0);
-      roomGroup.add(rightWall);
+  // Left wall (west, negative X)
+  if (hasWest) {
+    const leftWall = createWallWithDoorway();
+    leftWall.rotation.y = Math.PI / 2;
+    leftWall.position.set(-10, 0, 0);
+    roomGroup.add(leftWall);
+  }
 
-      // Register walls for collision
-      roomGroup.traverse((child) => {
-        if (child.userData && child.userData.isWall) {
-          wallSegments.push(child);
-        }
-      });
+  // Right wall (east, positive X)
+  if (hasEast) {
+    const rightWall = createWallWithDoorway();
+    rightWall.rotation.y = -Math.PI / 2;
+    rightWall.position.set(10, 0, 0);
+    roomGroup.add(rightWall);
+  }
 
-      scene.add(roomGroup);
-      return roomGroup;
+  // Register walls for collision
+  roomGroup.traverse((child) => {
+    if (child.userData && child.userData.isWall) {
+      wallSegments.push(child);
     }
+  });
+
+  scene.add(roomGroup);
+  return roomGroup;
+}
+
+// ===================== HALLWAYS =====================
+function createHallway(cx, cz, length, orientation, wallpaperTexture) {
+  const hallway = new THREE.Group();
+  hallway.position.set(cx, 0, cz);
+
+  const width = 6;
+  const height = 8;
+  const depth = length;
+
+  const wallMat = new THREE.MeshLambertMaterial({ map: wallpaperTexture });
+
+  // Floor
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, depth),
+    new THREE.MeshLambertMaterial({ color: 0x202124 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  hallway.add(floor);
+
+  // Ceiling
+  const ceiling = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, depth),
+    new THREE.MeshLambertMaterial({ color: 0x0f1014 })
+  );
+  ceiling.rotation.x = Math.PI / 2;
+  ceiling.position.y = height;
+  hallway.add(ceiling);
+
+  // Side walls
+  const wallGeo = new THREE.BoxGeometry(depth, height, 0.4);
+
+  const leftWall = new THREE.Mesh(wallGeo, wallMat);
+  leftWall.position.set(-width / 2, height / 2, 0);
+  leftWall.rotation.y = Math.PI / 2;
+  leftWall.userData.isWall = true;
+
+  const rightWall = new THREE.Mesh(wallGeo, wallMat);
+  rightWall.position.set(width / 2, height / 2, 0);
+  rightWall.rotation.y = Math.PI / 2;
+  rightWall.userData.isWall = true;
+
+  hallway.add(leftWall);
+  hallway.add(rightWall);
+
+  // Rotate east/west hallways
+  if (orientation === "x") {
+    hallway.rotation.y = Math.PI / 2;
+  }
+
+  hallway.traverse(obj => {
+    if (obj.userData.isWall) wallSegments.push(obj);
+  });
+
+  scene.add(hallway);
 
     function buildWallBoxes() {
       wallBoxes = [];
@@ -614,10 +726,16 @@
     function setupInput() {
       document.addEventListener("keydown", function (e) {
         keys[e.code] = true;
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
+          e.preventDefault();
+        }
       });
 
       document.addEventListener("keyup", function (e) {
         keys[e.code] = false;
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
+          e.preventDefault();
+        }
       });
 
       // Mouse buttons
@@ -732,10 +850,10 @@
       if (keys["KeyS"] || keys["ArrowDown"]) {
         movement.sub(forward);
       }
-      if (keys["KeyA"] || keys["ArrowLeft"]) {
+      if (keys["KeyA"]) {
         movement.sub(right);
       }
-      if (keys["KeyD"] || keys["ArrowRight"]) {
+      if (keys["KeyD"]) {
         movement.add(right);
       }
 
@@ -761,6 +879,24 @@
           camera.position.copy(proposed);
         }
       }
+    }
+
+    // ===================== ARROW-KEY ROTATION (classic style) =====================
+    function updateArrowRotation(delta) {
+      if (!gameStarted || gameOver) return;
+
+      const rotateSpeed = 1.8; // radians per second
+
+      // Left / Right arrows rotate the camera around the Y axis
+      if (keys["ArrowLeft"]) {
+        yaw += rotateSpeed * delta;
+      }
+      if (keys["ArrowRight"]) {
+        yaw -= rotateSpeed * delta;
+      }
+
+      // Apply the updated rotation
+      camera.rotation.set(pitch, yaw, 0);
     }
 
     // ===================== TIMER & DARKNESS =====================
@@ -838,9 +974,13 @@
       const delta = (now - lastFrameTime) / 1000;
       lastFrameTime = now;
 
-      updateMovement(delta);
-      updateTimer();
+      // Classic-style arrow rotation (A/B combined)
+      updateArrowRotation(delta);
 
+      // Modern FPS-style movement (WASD + ArrowUp/ArrowDown for forward/back)
+      updateMovement(delta);
+
+      updateTimer();
       renderer.render(scene, camera);
     }
 
