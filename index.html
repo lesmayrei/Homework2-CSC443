@@ -353,6 +353,12 @@
       ];
 
       // Create rooms in a plus shape: center + 4 around
+
+      // Hallways connecting the 5 rooms
+createHallway(0, -10, 8, "z", wallpapers[1]); // Center → North
+createHallway(0,  10, 8, "z", wallpapers[2]); // Center → South
+createHallway(-10, 0, 8, "x", wallpapers[3]); // Center → West
+createHallway( 10, 0, 8, "x", wallpapers[4]); // Center → East
 // Create rooms in a plus shape: center + 4 around
 const rooms = [];
 
