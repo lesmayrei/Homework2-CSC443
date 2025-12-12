@@ -206,70 +206,70 @@ let isPausedForMap = false;
       {
         id: "painting_1",
         title: "TODO – Brooklyn Museum Work 1",
-        url: "TODO-image-url-1.jpg",
+        url: "images/painting1.jpg",
         archiveUrl: "TODO-archive-link-1",
         size: { width: 3.2, height: 4.0 }
       },
       {
         id: "painting_2",
         title: "TODO – Brooklyn Museum Work 2",
-        url: "TODO-image-url-2.jpg",
+        url: "images/painting2.jpg",
         archiveUrl: "TODO-archive-link-2",
         size: { width: 3.5, height: 4.0 }
       },
       {
         id: "painting_3",
         title: "TODO – Brooklyn Museum Work 3",
-        url: "TODO-image-url-3.jpg",
+        url: "images/painting3.jpg",
         archiveUrl: "TODO-archive-link-3",
         size: { width: 3.0, height: 4.0 }
       },
       {
         id: "painting_4",
         title: "TODO – Brooklyn Museum Work 4",
-        url: "TODO-image-url-4.jpg",
+        url: "images/painting4.jpg",
         archiveUrl: "TODO-archive-link-4",
         size: { width: 3.0, height: 4.0 }
       },
       {
         id: "painting_5",
         title: "TODO – Brooklyn Museum Work 5",
-        url: "TODO-image-url-5.jpg",
+        url: "images/painting5.jpg",
         archiveUrl: "TODO-archive-link-5",
         size: { width: 3.0, height: 4.0 }
       },
       {
         id: "painting_6",
         title: "TODO – Brooklyn Museum Work 6",
-        url: "TODO-image-url-6.jpg",
+        url: "images/painting6.jpg",
         archiveUrl: "TODO-archive-link-6",
         size: { width: 3.0, height: 4.0 }
       },
       {
         id: "painting_7",
         title: "TODO – Brooklyn Museum Work 7",
-        url: "TODO-image-url-7.jpg",
+        url: "images/painting7.jpg",
         archiveUrl: "TODO-archive-link-7",
         size: { width: 3.0, height: 4.0 }
       },
       {
         id: "painting_8",
         title: "TODO – Brooklyn Museum Work 8",
-        url: "TODO-image-url-8.jpg",
+        url: "images/painting8.jpg",
         archiveUrl: "TODO-archive-link-8",
         size: { width: 3.0, height: 4.0 }
       },
       {
         id: "painting_9",
         title: "TODO – Brooklyn Museum Work 9",
-        url: "TODO-image-url-9.jpg",
+        url: "images/painting9.jpg",
         archiveUrl: "TODO-archive-link-9",
         size: { width: 3.0, height: 4.0 }
       },
       {
         id: "painting_10",
         title: "TODO – Brooklyn Museum Work 10",
-        url: "TODO-image-url-10.jpg",
+        url: "images/painting10.jpg",
         archiveUrl: "TODO-archive-link-10",
         size: { width: 3.0, height: 4.0 }
       }
@@ -385,9 +385,9 @@ rooms.push(createRoom(0, -20, wallpapers[1], {
   west:  true,
   east:  true,
 
-  doorNorth: false,
-  doorWest:  false,
-  doorEast:  false,
+  doorNorth: true,
+  doorWest:  true,
+  doorEast:  true,
   doorSouth: true   // doorway toward center
 }));
 
@@ -398,9 +398,9 @@ rooms.push(createRoom(0,  20, wallpapers[2], {
   west:  true,
   east:  true,
 
-  doorSouth: false,
-  doorWest:  false,
-  doorEast:  false,
+  doorSouth: true,
+  doorWest:  true,
+  doorEast:  true,
   doorNorth: true   // doorway toward center
 }));
 
@@ -962,10 +962,10 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
       if (keys["KeyS"] || keys["ArrowDown"]) {
         movement.sub(forward);
       }
-      if (keys["KeyA"]) {
+      if (keys["KeyA"] || keys["ArrowLeft"]) {
         movement.sub(right);
       }
-      if (keys["KeyD"]) {
+      if (keys["KeyD"] || keys["ArrowRight"]) {
         movement.add(right);
       }
 
@@ -1035,7 +1035,7 @@ function createHallway(cx, cz, length, orientation, wallpaperTexture) {
       timerDisplay.textContent = "Time: " + minutes + ":" + secStr;
 
       const t = 1 - remaining / GAME_DURATION; // 0 → 1
-      const alpha = Math.min(1, t * 1.25);
+      const alpha = Math.min(1, t * 0.8);
       darkOverlay.style.background = "rgba(0,0,0," + alpha.toFixed(3) + ")";
 
       if (remaining <= 0 && !gameOver) {
